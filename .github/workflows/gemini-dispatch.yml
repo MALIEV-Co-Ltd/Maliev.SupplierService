@@ -1,0 +1,69 @@
+name: Gemini AI - Dispatch
+
+on:
+  workflow_dispatch:
+    inputs:
+      action_type:
+        description: 'AI Action Type'
+        required: true
+        type: choice
+        options:
+          - 'code_review'
+          - 'code_assistance'
+          - 'issue_triage'
+          - 'documentation'
+          - 'testing'
+          - 'refactoring'
+        default: 'code_assistance'
+
+      target:
+        description: 'Target (PR number, issue number, or branch)'
+        required: false
+        type: string
+
+      prompt:
+        description: 'Custom prompt or instructions'
+        required: false
+        type: string
+
+jobs:
+  dispatch-ai-action:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Dispatch to appropriate workflow
+      run: |
+        case "${{ github.event.inputs.action_type }}" in
+          "code_review")
+            echo "Dispatching to code review workflow"
+            gh workflow run gemini-review.yml \
+              -f target="${{ github.event.inputs.target }}" \
+              -f prompt="${{ github.event.inputs.prompt }}"
+            ;;
+          "issue_triage")
+            echo "Dispatching to issue triage workflow"
+            gh workflow run gemini-triage.yml \
+              -f target="${{ github.event.inputs.target }}" \
+              -f prompt="${{ github.event.inputs.prompt }}"
+            ;;
+          *)
+            echo "Dispatching to general AI assistance workflow"
+            gh workflow run gemini-invoke.yml \
+              -f action_type="${{ github.event.inputs.action_type }}" \
+              -f target="${{ github.event.inputs.target }}" \
+              -f prompt="${{ github.event.inputs.prompt }}"
+            ;;
+        esac
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Log dispatch action
+      run: |
+        echo "AI Action Dispatched:"
+        echo "- Type: ${{ github.event.inputs.action_type }}"
+        echo "- Target: ${{ github.event.inputs.target }}"
+        echo "- Prompt: ${{ github.event.inputs.prompt }}"
+        echo "- Timestamp: $(date)"

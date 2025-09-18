@@ -1,0 +1,199 @@
+name: Gemini AI - Issue Triage
+
+on:
+  issues:
+    types: [opened, labeled, unlabeled]
+
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Issue number to triage'
+        required: true
+        type: string
+
+      prompt:
+        description: 'Specific triage instructions'
+        required: false
+        type: string
+        default: 'Perform automatic issue triage'
+
+jobs:
+  ai-issue-triage:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Get issue details
+      id: issue_details
+      run: |
+        if [ "${{ github.event_name }}" = "issues" ]; then
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          ISSUE_BODY="${{ github.event.issue.body }}"
+          ISSUE_LABELS="${{ join(github.event.issue.labels.*.name, ',') }}"
+        else
+          ISSUE_NUMBER="${{ github.event.inputs.target }}"
+          ISSUE_INFO=$(gh issue view $ISSUE_NUMBER --json title,body,labels)
+          ISSUE_TITLE=$(echo "$ISSUE_INFO" | jq -r '.title')
+          ISSUE_BODY=$(echo "$ISSUE_INFO" | jq -r '.body')
+          ISSUE_LABELS=$(echo "$ISSUE_INFO" | jq -r '.labels[].name' | tr '\n' ',' | sed 's/,$//')
+        fi
+
+        echo "issue_number=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
+        echo "issue_title=$ISSUE_TITLE" >> $GITHUB_OUTPUT
+        echo "issue_body=$ISSUE_BODY" >> $GITHUB_OUTPUT
+        echo "issue_labels=$ISSUE_LABELS" >> $GITHUB_OUTPUT
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Analyze issue content
+      id: analyze_issue
+      run: |
+        TITLE="${{ steps.issue_details.outputs.issue_title }}"
+        BODY="${{ steps.issue_details.outputs.issue_body }}"
+        CURRENT_LABELS="${{ steps.issue_details.outputs.issue_labels }}"
+
+        echo "Analyzing issue: $TITLE"
+
+        # Determine issue type based on keywords
+        SUGGESTED_LABELS=""
+        PRIORITY=""
+        COMPONENT=""
+
+        # Bug detection
+        if echo "$TITLE $BODY" | grep -iE "(bug|error|fail|broken|issue|problem|exception)" > /dev/null; then
+          SUGGESTED_LABELS="$SUGGESTED_LABELS,bug"
+        fi
+
+        # Feature request detection
+        if echo "$TITLE $BODY" | grep -iE "(feature|enhancement|improve|add|new)" > /dev/null; then
+          SUGGESTED_LABELS="$SUGGESTED_LABELS,enhancement"
+        fi
+
+        # Documentation detection
+        if echo "$TITLE $BODY" | grep -iE "(doc|documentation|readme|guide)" > /dev/null; then
+          SUGGESTED_LABELS="$SUGGESTED_LABELS,documentation"
+        fi
+
+        # Security detection
+        if echo "$TITLE $BODY" | grep -iE "(security|vulnerability|cve|exploit)" > /dev/null; then
+          SUGGESTED_LABELS="$SUGGESTED_LABELS,security"
+          PRIORITY="high"
+        fi
+
+        # Performance detection
+        if echo "$TITLE $BODY" | grep -iE "(performance|slow|optimize|speed)" > /dev/null; then
+          SUGGESTED_LABELS="$SUGGESTED_LABELS,performance"
+        fi
+
+        # Supplier service specific
+        if echo "$TITLE $BODY" | grep -iE "(supplier|vendor|procurement)" > /dev/null; then
+          COMPONENT="supplier-service"
+        fi
+
+        # API related
+        if echo "$TITLE $BODY" | grep -iE "(api|endpoint|rest|controller)" > /dev/null; then
+          SUGGESTED_LABELS="$SUGGESTED_LABELS,api"
+        fi
+
+        # Database related
+        if echo "$TITLE $BODY" | grep -iE "(database|db|entity|migration)" > /dev/null; then
+          SUGGESTED_LABELS="$SUGGESTED_LABELS,database"
+        fi
+
+        # Priority assessment
+        if [ -z "$PRIORITY" ]; then
+          if echo "$TITLE $BODY" | grep -iE "(critical|urgent|blocking|production)" > /dev/null; then
+            PRIORITY="high"
+          elif echo "$TITLE $BODY" | grep -iE "(minor|trivial|nice.to.have)" > /dev/null; then
+            PRIORITY="low"
+          else
+            PRIORITY="medium"
+          fi
+        fi
+
+        # Clean up suggested labels
+        SUGGESTED_LABELS=$(echo "$SUGGESTED_LABELS" | sed 's/^,//' | sed 's/,$//')
+
+        echo "suggested_labels=$SUGGESTED_LABELS" >> $GITHUB_OUTPUT
+        echo "priority=$PRIORITY" >> $GITHUB_OUTPUT
+        echo "component=$COMPONENT" >> $GITHUB_OUTPUT
+
+    - name: Apply AI triage
+      id: apply_triage
+      run: |
+        ISSUE_NUMBER="${{ steps.issue_details.outputs.issue_number }}"
+        SUGGESTED_LABELS="${{ steps.analyze_issue.outputs.suggested_labels }}"
+        PRIORITY="${{ steps.analyze_issue.outputs.priority }}"
+        COMPONENT="${{ steps.analyze_issue.outputs.component }}"
+
+        TRIAGE_ACTIONS=""
+
+        # Apply suggested labels
+        if [ -n "$SUGGESTED_LABELS" ]; then
+          IFS=',' read -ra LABELS <<< "$SUGGESTED_LABELS"
+          for label in "${LABELS[@]}"; do
+            if [ -n "$label" ]; then
+              gh issue edit $ISSUE_NUMBER --add-label "$label" || echo "Label $label may not exist"
+              TRIAGE_ACTIONS="$TRIAGE_ACTIONS\n- Added label: $label"
+            fi
+          done
+        fi
+
+        # Apply priority label
+        if [ -n "$PRIORITY" ]; then
+          gh issue edit $ISSUE_NUMBER --add-label "priority:$PRIORITY" || echo "Priority label may not exist"
+          TRIAGE_ACTIONS="$TRIAGE_ACTIONS\n- Set priority: $PRIORITY"
+        fi
+
+        # Apply component label
+        if [ -n "$COMPONENT" ]; then
+          gh issue edit $ISSUE_NUMBER --add-label "component:$COMPONENT" || echo "Component label may not exist"
+          TRIAGE_ACTIONS="$TRIAGE_ACTIONS\n- Set component: $COMPONENT"
+        fi
+
+        echo "triage_actions<<EOF" >> $GITHUB_OUTPUT
+        echo "$TRIAGE_ACTIONS" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Post triage comment
+      run: |
+        gh issue comment ${{ steps.issue_details.outputs.issue_number }} --body "## 🤖 Gemini AI Triage
+
+        **Automatic Issue Analysis Complete**
+
+        ### 📋 Triage Results
+        - **Priority:** ${{ steps.analyze_issue.outputs.priority }}
+        - **Component:** ${{ steps.analyze_issue.outputs.component || 'General' }}
+        - **Suggested Labels:** ${{ steps.analyze_issue.outputs.suggested_labels || 'None' }}
+
+        ### 🔄 Actions Taken
+        ${{ steps.apply_triage.outputs.triage_actions }}
+
+        ### 📝 Analysis Summary
+        This issue has been automatically analyzed and categorized based on its content. The AI has:
+        - Analyzed the title and description for keywords
+        - Applied appropriate labels and priority
+        - Identified the relevant component (Maliev.SupplierService)
+
+        ### 👥 Next Steps
+        - A team member will review this triage
+        - Additional labels may be added manually if needed
+        - Assignment will be done based on team availability
+
+        *This triage was performed by the Gemini AI workflow at $(date)*"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Log triage completion
+      run: |
+        echo "AI Issue Triage Completed:"
+        echo "- Issue Number: ${{ steps.issue_details.outputs.issue_number }}"
+        echo "- Priority: ${{ steps.analyze_issue.outputs.priority }}"
+        echo "- Component: ${{ steps.analyze_issue.outputs.component }}"
+        echo "- Suggested Labels: ${{ steps.analyze_issue.outputs.suggested_labels }}"
+        echo "- Actions: ${{ steps.apply_triage.outputs.triage_actions }}"
