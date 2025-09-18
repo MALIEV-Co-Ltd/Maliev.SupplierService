@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Build results
+**/bin/
+**/obj/
+**/Debug/
+**/Release/
+**/x64/
+**/x86/
+**/Any CPU/
+
+# Visual Studio
+.vs/
+*.suo
+*.csproj.user
+*.sln.docstates
+
+# Testing
+**/TestResults/
+**/*.trx
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# Documentation
+README.md
+LICENSE
+
+# Other
+**/.vscode/
+**/*.log
+**/*.tmp
