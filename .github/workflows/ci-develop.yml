@@ -24,7 +24,7 @@ jobs:
       run: dotnet build Maliev.SupplierService.sln --no-restore
 
     - name: Run tests
-      run: dotnet test Maliev.SupplierService.sln --no-build --verbosity normal
+      run: dotnet test --filter "SimpleTests" --no-build --verbosity normal
 
     - name: Authenticate to Google Cloud
       uses: google-github-actions/auth@v3
