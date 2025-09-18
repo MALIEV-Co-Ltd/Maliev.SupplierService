@@ -37,7 +37,8 @@ jobs:
 
     - name: Build and push Docker image
       run: |
-        docker build -t asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-staging/maliev-supplier-service:${{ github.sha }} .
+        gcloud auth configure-docker asia-southeast1-docker.pkg.dev
+        docker build -t asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-staging/maliev-supplier-service:${{ github.sha }} -f Maliev.SupplierService.Api/Dockerfile .
         docker push asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-staging/maliev-supplier-service:${{ github.sha }}
 
     - name: Checkout GitOps repository
