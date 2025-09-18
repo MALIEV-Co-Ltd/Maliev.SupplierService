@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using Asp.Versioning.ApiExplorer;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -39,6 +40,11 @@ if (!string.IsNullOrEmpty(connectionString))
 // Services
 builder.Services.AddControllers();
 builder.Services.AddMemoryCache();
+
+// Register business services
+builder.Services.AddScoped<Maliev.SupplierService.Api.Services.ISupplierService, Maliev.SupplierService.Api.Services.SupplierService>();
+builder.Services.AddScoped<Maliev.SupplierService.Api.Services.ISupplierCategoryService, Maliev.SupplierService.Api.Services.SupplierCategoryService>();
+builder.Services.AddScoped<Maliev.SupplierService.Api.Services.ISupplierContactService, Maliev.SupplierService.Api.Services.SupplierContactService>();
 
 // API Versioning
 builder.Services.AddApiVersioning(opt =>
@@ -99,7 +105,11 @@ app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
     c.RoutePrefix = "suppliers/swagger";
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Supplier Service API v1");
+    var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
+    foreach (var description in provider.ApiVersionDescriptions)
+    {
+        c.SwaggerEndpoint($"/suppliers/swagger/{description.GroupName}/swagger.json", description.GroupName.ToUpperInvariant());
+    }
 });
 
 app.UseHttpsRedirection();

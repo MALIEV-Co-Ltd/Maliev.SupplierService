@@ -1,9 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Maliev.SupplierService.Data.DbContexts;
-using Maliev.SupplierService.Data.Entities;
 using Maliev.SupplierService.Api.Models;
+using Maliev.SupplierService.Api.Services;
 
 namespace Maliev.SupplierService.Api.Controllers;
 
@@ -12,41 +10,21 @@ namespace Maliev.SupplierService.Api.Controllers;
 [Authorize]
 public class SupplierCategoriesController : ControllerBase
 {
-    private readonly SupplierDbContext _context;
+    private readonly ISupplierCategoryService _categoryService;
     private readonly ILogger<SupplierCategoriesController> _logger;
 
-    public SupplierCategoriesController(SupplierDbContext context, ILogger<SupplierCategoriesController> logger)
+    public SupplierCategoriesController(ISupplierCategoryService categoryService, ILogger<SupplierCategoriesController> logger)
     {
-        _context = context;
+        _categoryService = categoryService;
         _logger = logger;
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<SupplierCategoryDto>>> GetCategories(
-        [FromQuery] bool? isActive = null)
+    public async Task<ActionResult<IEnumerable<SupplierCategoryDto>>> GetCategories(CancellationToken cancellationToken = default)
     {
         try
         {
-            var query = _context.SupplierCategories.AsQueryable();
-
-            if (isActive.HasValue)
-            {
-                query = query.Where(c => c.IsActive == isActive.Value);
-            }
-
-            var categories = await query
-                .OrderBy(c => c.Name)
-                .Select(c => new SupplierCategoryDto
-                {
-                    Id = c.Id,
-                    Name = c.Name,
-                    Description = c.Description,
-                    IsActive = c.IsActive,
-                    CreatedAt = c.CreatedAt,
-                    UpdatedAt = c.UpdatedAt
-                })
-                .ToListAsync();
-
+            var categories = await _categoryService.GetCategoriesAsync(cancellationToken);
             return Ok(categories);
         }
         catch (Exception ex)
@@ -57,61 +35,38 @@ public class SupplierCategoriesController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<SupplierCategoryDto>> GetCategory(int id)
+    public async Task<ActionResult<SupplierCategoryDto>> GetCategory(int id, CancellationToken cancellationToken = default)
     {
         try
         {
-            var category = await _context.SupplierCategories.FindAsync(id);
+            var category = await _categoryService.GetCategoryByIdAsync(id, cancellationToken);
+
             if (category == null)
             {
-                return NotFound($"Supplier category with ID {id} not found");
+                return NotFound();
             }
 
-            var categoryDto = new SupplierCategoryDto
-            {
-                Id = category.Id,
-                Name = category.Name,
-                Description = category.Description,
-                IsActive = category.IsActive,
-                CreatedAt = category.CreatedAt,
-                UpdatedAt = category.UpdatedAt
-            };
-
-            return Ok(categoryDto);
+            return Ok(category);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving supplier category {CategoryId}", id);
+            _logger.LogError(ex, "Error retrieving supplier category with ID {CategoryId}", id);
             return StatusCode(500, "An error occurred while retrieving the supplier category");
         }
     }
 
     [HttpPost]
-    public async Task<ActionResult<SupplierCategoryDto>> CreateCategory(CreateSupplierCategoryRequest request)
+    public async Task<ActionResult<SupplierCategoryDto>> CreateCategory(SupplierCategoryDto categoryDto, CancellationToken cancellationToken = default)
     {
         try
         {
-            var category = new SupplierCategory
+            if (!ModelState.IsValid)
             {
-                Name = request.Name,
-                Description = request.Description,
-                IsActive = request.IsActive
-            };
+                return BadRequest(ModelState);
+            }
 
-            _context.SupplierCategories.Add(category);
-            await _context.SaveChangesAsync();
-
-            var categoryDto = new SupplierCategoryDto
-            {
-                Id = category.Id,
-                Name = category.Name,
-                Description = category.Description,
-                IsActive = category.IsActive,
-                CreatedAt = category.CreatedAt,
-                UpdatedAt = category.UpdatedAt
-            };
-
-            return CreatedAtAction(nameof(GetCategory), new { id = category.Id }, categoryDto);
+            var createdCategory = await _categoryService.CreateCategoryAsync(categoryDto, cancellationToken);
+            return CreatedAtAction(nameof(GetCategory), new { id = createdCategory.Id }, createdCategory);
         }
         catch (Exception ex)
         {
@@ -121,50 +76,48 @@ public class SupplierCategoriesController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateCategory(int id, UpdateSupplierCategoryRequest request)
+    public async Task<ActionResult<SupplierCategoryDto>> UpdateCategory(int id, SupplierCategoryDto categoryDto, CancellationToken cancellationToken = default)
     {
         try
         {
-            var category = await _context.SupplierCategories.FindAsync(id);
-            if (category == null)
+            if (!ModelState.IsValid)
             {
-                return NotFound($"Supplier category with ID {id} not found");
+                return BadRequest(ModelState);
             }
 
-            category.Name = request.Name;
-            category.Description = request.Description;
-            category.IsActive = request.IsActive;
+            var updatedCategory = await _categoryService.UpdateCategoryAsync(id, categoryDto, cancellationToken);
 
-            await _context.SaveChangesAsync();
+            if (updatedCategory == null)
+            {
+                return NotFound();
+            }
 
-            return NoContent();
+            return Ok(updatedCategory);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating supplier category {CategoryId}", id);
+            _logger.LogError(ex, "Error updating supplier category with ID {CategoryId}", id);
             return StatusCode(500, "An error occurred while updating the supplier category");
         }
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteCategory(int id)
+    public async Task<IActionResult> DeleteCategory(int id, CancellationToken cancellationToken = default)
     {
         try
         {
-            var category = await _context.SupplierCategories.FindAsync(id);
-            if (category == null)
-            {
-                return NotFound($"Supplier category with ID {id} not found");
-            }
+            var deleted = await _categoryService.DeleteCategoryAsync(id, cancellationToken);
 
-            _context.SupplierCategories.Remove(category);
-            await _context.SaveChangesAsync();
+            if (!deleted)
+            {
+                return NotFound();
+            }
 
             return NoContent();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting supplier category {CategoryId}", id);
+            _logger.LogError(ex, "Error deleting supplier category with ID {CategoryId}", id);
             return StatusCode(500, "An error occurred while deleting the supplier category");
         }
     }
