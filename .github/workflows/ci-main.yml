@@ -15,10 +15,14 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "9.x"
+          dotnet-version: "10.x"
+          dotnet-quality: "preview"
 
       - name: Restore dependencies
         run: dotnet restore Maliev.SupplierService.sln
+        env:
+          NUGET_USERNAME: ${{ github.actor }}
+          NUGET_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build solution
         run: dotnet build Maliev.SupplierService.sln --no-restore
@@ -36,7 +40,12 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          docker build -t asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-prod/maliev-supplier-service:${{ github.sha }} -f Maliev.SupplierService.Api/Dockerfile .
+          echo "${{ secrets.GITHUB_TOKEN }}" > /tmp/nuget_token
+          DOCKER_BUILDKIT=1 docker build \
+            --secret id=nuget_github_token,src=/tmp/nuget_token \
+            -t asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-prod/maliev-supplier-service:${{ github.sha }} \
+            -f Maliev.SupplierService.Api/Dockerfile .
+          rm -f /tmp/nuget_token
           docker push asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-prod/maliev-supplier-service:${{ github.sha }}
 
       - name: Checkout GitOps repository
