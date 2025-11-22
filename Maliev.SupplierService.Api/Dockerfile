@@ -14,7 +14,7 @@ COPY Maliev.SupplierService.Data/Maliev.SupplierService.Data.csproj Maliev.Suppl
 RUN --mount=type=secret,id=nuget_github_token \
     GITHUB_TOKEN=$(cat /run/secrets/nuget_github_token 2>/dev/null || echo "") && \
     if [ -n "$GITHUB_TOKEN" ]; then \
-        dotnet nuget update source github-maliev --username docker --password "$GITHUB_TOKEN" --store-password-in-clear-text --configfile nuget.config 2>/dev/null || true; \
+        dotnet nuget update source github --username docker --password "$GITHUB_TOKEN" --store-password-in-clear-text --configfile nuget.config 2>/dev/null || true; \
     fi && \
     dotnet restore Maliev.SupplierService.Api/Maliev.SupplierService.Api.csproj
 
