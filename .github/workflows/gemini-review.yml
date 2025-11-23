@@ -31,7 +31,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "9.x"
+          dotnet-version: "10.x"
 
       - name: Get PR details
         id: pr_details
@@ -83,6 +83,9 @@ jobs:
             dotnet build Maliev.SupplierService.sln --no-restore || echo "Build issues detected"
             dotnet test Maliev.SupplierService.sln --no-build --verbosity minimal || echo "Test issues detected"
           fi
+        env:
+          NUGET_USERNAME: ${{ github.actor }}
+          NUGET_PASSWORD: ${{ secrets.GITOPS_PAT }}
 
       - name: Perform AI code review
         id: ai_review

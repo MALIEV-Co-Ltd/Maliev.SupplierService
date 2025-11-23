@@ -40,13 +40,15 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          echo "${{ secrets.GITOPS_PAT }}" > /tmp/nuget_token
-          DOCKER_BUILDKIT=1 docker build \
-            --secret id=nuget_github_token,src=/tmp/nuget_token \
+          docker build \
+            --secret id=nuget_username,env=NUGET_USERNAME \
+            --secret id=nuget_password,env=NUGET_PASSWORD \
             -t asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-staging/maliev-supplier-service:${{ github.sha }} \
             -f Maliev.SupplierService.Api/Dockerfile .
-          rm -f /tmp/nuget_token
           docker push asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-staging/maliev-supplier-service:${{ github.sha }}
+        env:
+          NUGET_USERNAME: ${{ github.actor }}
+          NUGET_PASSWORD: ${{ secrets.GITOPS_PAT }}
 
       - name: Checkout GitOps repository
         uses: actions/checkout@v5
