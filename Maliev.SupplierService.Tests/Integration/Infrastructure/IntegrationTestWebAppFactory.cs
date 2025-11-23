@@ -1,4 +1,3 @@
-using DotNet.Testcontainers.Builders;
 using Maliev.SupplierService.Api.Services;
 using Maliev.SupplierService.Data;
 using MassTransit;
@@ -25,19 +24,16 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
         .WithDatabase("supplier_test_db")
         .WithUsername("test_user")
         .WithPassword("test_password")
-        .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(5432))
         .Build();
 
     private readonly RedisContainer _redisContainer = new RedisBuilder()
         .WithImage("redis:7-alpine")
-        .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(6379))
         .Build();
 
     private readonly RabbitMqContainer _rabbitMqContainer = new RabbitMqBuilder()
         .WithImage("rabbitmq:3-management-alpine")
         .WithUsername("guest")
         .WithPassword("guest")
-        .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(5672))
         .Build();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)

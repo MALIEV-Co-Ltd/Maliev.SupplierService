@@ -1,6 +1,64 @@
 @Maliev.SupplierService.Api_HostAddress = http://localhost:5272
+@version = 1
 
-GET {{Maliev.SupplierService.Api_HostAddress}}/weatherforecast/
+### List suppliers
+GET {{Maliev.SupplierService.Api_HostAddress}}/suppliers/v{{version}}/suppliers?page=1&pageSize=20
 Accept: application/json
 
-###
+### Get supplier by ID
+GET {{Maliev.SupplierService.Api_HostAddress}}/suppliers/v{{version}}/suppliers/{{$guid}}
+Accept: application/json
+
+### Validate supplier
+GET {{Maliev.SupplierService.Api_HostAddress}}/suppliers/v{{version}}/suppliers/{{$guid}}/validate
+Accept: application/json
+
+### Check supplier eligibility
+GET {{Maliev.SupplierService.Api_HostAddress}}/suppliers/v{{version}}/suppliers/{{$guid}}/eligibility
+Accept: application/json
+
+### List material categories
+GET {{Maliev.SupplierService.Api_HostAddress}}/suppliers/v{{version}}/categories
+Accept: application/json
+
+### Create supplier
+POST {{Maliev.SupplierService.Api_HostAddress}}/suppliers/v{{version}}/suppliers
+Content-Type: application/json
+
+{
+  "companyName": "Acme Supplies Ltd",
+  "taxId": "TAX-12345678",
+  "address": "123 Industrial Avenue",
+  "city": "London",
+  "country": "United Kingdom",
+  "postalCode": "EC1A 1BB",
+  "materialCategoryIds": [],
+  "capabilities": ["Manufacturing", "Quality Testing"],
+  "primaryContact": {
+    "name": "John Smith",
+    "email": "john.smith@acme-supplies.com",
+    "role": "Account Manager",
+    "phone": "+44 20 1234 5678"
+  }
+}
+
+### Update supplier status
+PATCH {{Maliev.SupplierService.Api_HostAddress}}/suppliers/v{{version}}/suppliers/{{$guid}}/status
+Content-Type: application/json
+
+{
+  "status": "Active",
+  "reason": "Onboarding completed successfully"
+}
+
+### Health check - Liveness
+GET {{Maliev.SupplierService.Api_HostAddress}}/suppliers/liveness
+Accept: application/json
+
+### Health check - Readiness
+GET {{Maliev.SupplierService.Api_HostAddress}}/suppliers/readiness
+Accept: application/json
+
+### Metrics
+GET {{Maliev.SupplierService.Api_HostAddress}}/suppliers/metrics
+Accept: text/plain

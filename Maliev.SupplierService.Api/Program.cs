@@ -71,13 +71,22 @@ app.UseSerilogRequestLogging();
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
-    app.MapScalarApiReference(options =>
+    // Map OpenAPI at /suppliers/openapi/v1.json
+    app.MapOpenApi("/suppliers/openapi/{documentName}.json");
+
+    // Map Scalar at /suppliers/scalar/v1 path (matches ingress /suppliers prefix)
+    app.MapScalarApiReference("/suppliers/scalar/v1", options =>
     {
-        options.WithTitle("MALIEV Supplier Service API")
-            .WithTheme(ScalarTheme.BluePlanet)
-            .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
+        options
+            .WithTitle("MALIEV Supplier Service API")
+            .WithTheme(ScalarTheme.Default)
+            .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient)
+            .WithOpenApiRoutePattern("/suppliers/openapi/v1.json");
     });
+
+    // Redirect root to Scalar
+    app.MapGet("/", () => Results.Redirect("/suppliers/scalar/v1")).ExcludeFromDescription();
+    app.MapGet("/suppliers", () => Results.Redirect("/suppliers/scalar/v1")).ExcludeFromDescription();
 }
 
 // Use CORS

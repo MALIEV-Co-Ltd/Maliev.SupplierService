@@ -179,7 +179,7 @@ paths:
       summary: Delete a supplier
       description: |
         Deletes a supplier if not referenced by other services.
-        Performs synchronous checks with Purchase Order, Invoice, and Stock services.
+        Performs synchronous checks with Purchase Order, Invoice, and Material services.
       responses:
         '204':
           description: Supplier deleted successfully

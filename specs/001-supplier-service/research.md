@@ -90,7 +90,7 @@ suppliers:eligibility:{id}       # Eligibility check result
 **Decision**: Implement typed HttpClients with Polly resilience for synchronous dependency checks during supplier deletion.
 
 **Rationale**:
-- FR-005 requires synchronous verification with Purchase Order, Invoice, and Stock services
+- FR-005 requires synchronous verification with Purchase Order, Invoice, and Material services
 - Fail-closed behavior (FR-005a) requires reliable timeout handling
 - Polly provides retry with exponential backoff and circuit breaker patterns
 
@@ -346,7 +346,7 @@ certifications_expiring_soon{days="7|30|90"}
 
 # Histogram
 supplier_operation_duration_seconds{operation="..."}
-dependency_check_duration_seconds{service="PurchaseOrder|Invoice|Stock"}
+dependency_check_duration_seconds{service="PurchaseOrder|Invoice|Material"}
 ```
 
 **Labels (per Constitution)**:

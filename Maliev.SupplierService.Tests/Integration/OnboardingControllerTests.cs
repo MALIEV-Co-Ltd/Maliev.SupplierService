@@ -110,7 +110,7 @@ public class OnboardingControllerTests : BaseIntegrationTest
         var result = await GetResponseAsync<OnboardingHistoryResponse>(response);
         result.Should().NotBeNull();
         result!.CurrentStage.Should().Be(OnboardingStage.FinalApproval);
-        result.History.Should().HaveCountGreaterOrEqualTo(2);
+        result.History.Should().HaveCountGreaterThanOrEqualTo(2);
     }
 
     [Fact]

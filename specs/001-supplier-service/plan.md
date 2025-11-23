@@ -5,7 +5,7 @@
 
 ## Summary
 
-The Supplier Service is the authoritative source of supplier information within the MALIEV microservices ecosystem. It provides a high-performance WebAPI for managing supplier records including company profiles, contacts, material categories, capabilities, certifications, performance ratings, and onboarding workflows. The service implements comprehensive audit trails, caching for read performance, and deletion protection via synchronous dependency checks with Purchase Order, Invoice, and Stock services.
+The Supplier Service is the authoritative source of supplier information within the MALIEV microservices ecosystem. It provides a high-performance WebAPI for managing supplier records including company profiles, contacts, material categories, capabilities, certifications, performance ratings, and onboarding workflows. The service implements comprehensive audit trails, caching for read performance, and deletion protection via synchronous dependency checks with Purchase Order, Invoice, and Material services.
 
 **Technical Approach**: .NET 10 WebAPI with Clean Architecture pattern, PostgreSQL for persistence, Redis for distributed caching, RabbitMQ for event publishing, and Testcontainers for integration testing.
 
@@ -131,8 +131,8 @@ Maliev.SupplierService.Api/
 │       ├── PurchaseOrderServiceClient.cs
 │       ├── IInvoiceServiceClient.cs
 │       ├── InvoiceServiceClient.cs
-│       ├── IStockServiceClient.cs
-│       └── StockServiceClient.cs
+│       ├── IMaterialServiceClient.cs
+│       └── MaterialServiceClient.cs
 ├── Validators/
 │   ├── CreateSupplierRequestValidator.cs
 │   ├── UpdateSupplierRequestValidator.cs

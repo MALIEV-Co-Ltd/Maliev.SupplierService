@@ -103,8 +103,8 @@ dotnet run --project Maliev.SupplierService.Api/Maliev.SupplierService.Api.cspro
       "BaseUrl": "http://localhost:5002",
       "TimeoutInSeconds": 30
     },
-    "StockService": {
-      "BaseUrl": "http://localhost:5003",
+    "MaterialService": {
+      "BaseUrl": "http://localhost:5068",
       "TimeoutInSeconds": 30
     }
   },
