@@ -6,7 +6,7 @@ public class ExternalServicesSettings
 
     public ServiceEndpoint PurchaseOrderService { get; set; } = new();
     public ServiceEndpoint InvoiceService { get; set; } = new();
-    public ServiceEndpoint StockService { get; set; } = new();
+    public ServiceEndpoint MaterialService { get; set; } = new();
 }
 
 public class ServiceEndpoint

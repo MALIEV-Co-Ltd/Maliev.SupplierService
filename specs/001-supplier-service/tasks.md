@@ -76,7 +76,7 @@ This is a MALIEV 3-project microservice structure:
 - [X] T031 [P] Create configuration class `Maliev.SupplierService.Api/Configuration/JwtSettings.cs`
 - [X] T032 [P] Create configuration class `Maliev.SupplierService.Api/Configuration/RedisSettings.cs`
 - [X] T033 [P] Create configuration class `Maliev.SupplierService.Api/Configuration/RabbitMQSettings.cs`
-- [X] T034 [P] Create configuration class `Maliev.SupplierService.Api/Configuration/ExternalServicesSettings.cs` for PurchaseOrder, Invoice, Stock services
+- [X] T034 [P] Create configuration class `Maliev.SupplierService.Api/Configuration/ExternalServicesSettings.cs` for PurchaseOrder, Invoice, Material services
 - [X] T035 Create middleware `Maliev.SupplierService.Api/Middleware/ExceptionHandlingMiddleware.cs` with structured error responses
 - [X] T036 Create middleware `Maliev.SupplierService.Api/Middleware/RequestLoggingMiddleware.cs` with Serilog
 - [X] T037 Create extension `Maliev.SupplierService.Api/Extensions/ServiceCollectionExtensions.cs` for DI registration
@@ -354,10 +354,10 @@ This is a MALIEV 3-project microservice structure:
 
 - [X] T114 [P] Create interface `Maliev.SupplierService.Api/Services/ExternalServices/IPurchaseOrderServiceClient.cs` with CheckReferencesAsync
 - [X] T115 [P] Create interface `Maliev.SupplierService.Api/Services/ExternalServices/IInvoiceServiceClient.cs` with CheckReferencesAsync
-- [X] T116 [P] Create interface `Maliev.SupplierService.Api/Services/ExternalServices/IStockServiceClient.cs` with CheckReferencesAsync
+- [X] T116 [P] Create interface `Maliev.SupplierService.Api/Services/ExternalServices/IMaterialServiceClient.cs` with CheckReferencesAsync
 - [X] T117 [P] Create implementation `Maliev.SupplierService.Api/Services/ExternalServices/PurchaseOrderServiceClient.cs` with Polly resilience per research.md
 - [X] T118 [P] Create implementation `Maliev.SupplierService.Api/Services/ExternalServices/InvoiceServiceClient.cs` with Polly resilience
-- [X] T119 [P] Create implementation `Maliev.SupplierService.Api/Services/ExternalServices/StockServiceClient.cs` with Polly resilience
+- [X] T119 [P] Create implementation `Maliev.SupplierService.Api/Services/ExternalServices/MaterialServiceClient.cs` with Polly resilience
 
 ### DTOs for Deletion
 

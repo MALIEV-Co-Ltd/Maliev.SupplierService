@@ -1,54 +1,55 @@
-# syntax=docker/dockerfile:1.4
-FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
+# Multi-stage build for Supplier Service
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Copy NuGet config and solution files
-COPY nuget.config ./
-COPY Maliev.SupplierService.sln ./
+# Copy nuget.config and project files
+COPY ["nuget.config", "."]
+COPY ["Maliev.SupplierService.sln", "."]
+COPY ["Maliev.SupplierService.Api/Maliev.SupplierService.Api.csproj", "Maliev.SupplierService.Api/"]
+COPY ["Maliev.SupplierService.Data/Maliev.SupplierService.Data.csproj", "Maliev.SupplierService.Data/"]
 
-# Copy project files for restore
-COPY Maliev.SupplierService.Api/Maliev.SupplierService.Api.csproj Maliev.SupplierService.Api/
-COPY Maliev.SupplierService.Data/Maliev.SupplierService.Data.csproj Maliev.SupplierService.Data/
-
-# Restore with BuildKit secrets for private NuGet feeds
-RUN --mount=type=secret,id=nuget_github_token \
-    GITHUB_TOKEN=$(cat /run/secrets/nuget_github_token 2>/dev/null || echo "") && \
-    if [ -n "$GITHUB_TOKEN" ]; then \
-        dotnet nuget update source github --username docker --password "$GITHUB_TOKEN" --store-password-in-clear-text --configfile nuget.config 2>/dev/null || true; \
-    fi && \
-    dotnet restore Maliev.SupplierService.Api/Maliev.SupplierService.Api.csproj
+# Restore with GitHub Packages authentication using BuildKit secrets
+RUN --mount=type=secret,id=nuget_username \
+    --mount=type=secret,id=nuget_password \
+    NUGET_USERNAME=$(cat /run/secrets/nuget_username) \
+    NUGET_PASSWORD=$(cat /run/secrets/nuget_password) \
+    dotnet restore "./Maliev.SupplierService.Api/Maliev.SupplierService.Api.csproj"
 
 # Copy source code
-COPY Maliev.SupplierService.Api/ Maliev.SupplierService.Api/
-COPY Maliev.SupplierService.Data/ Maliev.SupplierService.Data/
+COPY ["Maliev.SupplierService.Api/", "Maliev.SupplierService.Api/"]
+COPY ["Maliev.SupplierService.Data/", "Maliev.SupplierService.Data/"]
 
-# Build and publish
+# Build the application
 WORKDIR /src/Maliev.SupplierService.Api
-RUN dotnet publish -c Release -o /app/publish --no-restore
+RUN dotnet build "Maliev.SupplierService.Api.csproj" -c Release -o /app/build
 
-# Runtime image
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview AS runtime
+# Publish the application
+FROM build AS publish
+RUN dotnet publish "Maliev.SupplierService.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+# Final stage - runtime image
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
-# Create non-root user (use different IDs to avoid conflicts with base image)
-RUN groupadd --gid 1001 appgroup && \
-    useradd --uid 1001 --gid appgroup --shell /bin/bash --create-home appuser
-
 # Copy published application
-COPY --from=build /app/publish .
+COPY --from=publish /app/publish .
 
-# Set ownership and switch to non-root user
-RUN chown -R appuser:appgroup /app
-USER appuser
+# Change ownership to the built-in 'app' user
+RUN chown -R app:app /app
 
-# Configure ASP.NET Core
-ENV ASPNETCORE_URLS=http://+:8080
-ENV ASPNETCORE_ENVIRONMENT=Production
-ENV DOTNET_EnableDiagnostics=0
+# Switch to the non-root 'app' user (already exists in ASP.NET runtime image)
+USER app
 
+# Expose port
 EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/suppliers/health/ready || exit 1
+# Set environment variables
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/suppliers/liveness || exit 1
+
+# Start the application
 ENTRYPOINT ["dotnet", "Maliev.SupplierService.Api.dll"]

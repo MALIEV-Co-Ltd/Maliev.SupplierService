@@ -145,12 +145,12 @@ As an auditor or compliance officer, I need to view the complete audit trail for
 ### Edge Cases
 
 - What happens when attempting to delete a supplier that is referenced by existing purchase orders? The system must prevent deletion and return a clear error explaining the dependency.
-- What happens when attempting to delete a supplier referenced by invoices or stock transactions? Same protection applies - deletion is blocked with explanation of blocking references.
+- What happens when attempting to delete a supplier referenced by invoices or materials? Same protection applies - deletion is blocked with explanation of blocking references.
 - What happens when a supplier's certification expires? The system should allow querying for expired certifications but not automatically change supplier status (manual review required).
 - What happens when updating a supplier while another user is editing? Optimistic concurrency control should detect conflicts and prevent data loss.
 - What happens when the external document storage service is unavailable? Document metadata operations should still succeed; only the file reference is stored locally.
 - What happens when retrieving a supplier with a very large audit history? Audit trail queries should be paginated to maintain performance.
-- What happens when a dependent service (Purchase Order, Invoice, Stock) is unavailable during a deletion attempt? The system must fail the deletion safely (fail-closed) and return an error indicating which service(s) could not be reached, preventing accidental deletion of referenced suppliers.
+- What happens when a dependent service (Purchase Order, Invoice, Material) is unavailable during a deletion attempt? The system must fail the deletion safely (fail-closed) and return an error indicating which service(s) could not be reached, preventing accidental deletion of referenced suppliers.
 
 ## Requirements *(mandatory)*
 
@@ -162,7 +162,7 @@ As an auditor or compliance officer, I need to view the complete audit trail for
 - **FR-002**: System MUST assign a unique identifier to each supplier upon creation.
 - **FR-003**: System MUST allow retrieval of supplier information by unique identifier.
 - **FR-004**: System MUST allow updating of supplier information with partial updates supported.
-- **FR-005**: System MUST prevent deletion of suppliers that are referenced by purchase orders, invoices, or stock transactions. Verification is performed via synchronous API calls to dependent services (Purchase Order Service, Invoice Service, Stock Service) at deletion time to ensure real-time accuracy.
+- **FR-005**: System MUST prevent deletion of suppliers that are referenced by purchase orders, invoices, or materials. Verification is performed via synchronous API calls to dependent services (Purchase Order Service, Invoice Service, Material Service) at deletion time to ensure real-time accuracy.
 - **FR-005a**: System MUST fail the deletion operation safely if any dependent service is unavailable during the reference check (fail-closed behavior).
 - **FR-006**: System MUST return clear error messages indicating blocking references when deletion is prevented, including which service(s) reported active references.
 
@@ -239,7 +239,7 @@ As an auditor or compliance officer, I need to view the complete audit trail for
 - **SC-003**: Active supplier list queries return results in under 1 second for lists up to 1000 suppliers.
 - **SC-004**: System supports at least 100 concurrent users performing supplier operations without degradation.
 - **SC-005**: 100% of supplier data modifications are captured in audit logs with no gaps.
-- **SC-006**: Suppliers with blocking references (purchase orders, invoices, stock) cannot be deleted under any circumstances.
+- **SC-006**: Suppliers with blocking references (purchase orders, invoices, materials) cannot be deleted under any circumstances.
 - **SC-007**: Cache hit rate for active supplier queries exceeds 80% during normal operations.
 - **SC-008**: Purchase Order Service can validate supplier eligibility in under 200 milliseconds.
 - **SC-009**: Users can identify suppliers with expiring certifications (within 30 days) through a single query.
@@ -249,7 +249,7 @@ As an auditor or compliance officer, I need to view the complete audit trail for
 
 - Authentication and authorization are handled by an existing identity service; this service will receive authenticated requests with user context.
 - The external document management/upload service exists and provides a mechanism to store files and return references.
-- Other microservices (Purchase Order Service, Invoice Service, Stock Service) exist or will exist and can be queried to check for supplier references before deletion.
+- Other microservices (Purchase Order Service, Invoice Service, Material Service) exist or will exist and can be queried to check for supplier references before deletion.
 - Standard pagination defaults (page size of 20-50 items) are acceptable unless otherwise configured.
 - Onboarding workflow stages are fixed as specified; custom workflows are out of scope for initial implementation.
 - Performance ratings use a 1-5 integer scale where 1 = Poor and 5 = Excellent.

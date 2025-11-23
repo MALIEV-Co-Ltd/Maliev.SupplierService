@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.IdentityModel.Tokens;
-using Polly;
 using StackExchange.Redis;
 
 namespace Maliev.SupplierService.Api.Extensions;
@@ -108,19 +107,33 @@ public static class ServiceCollectionExtensions
         var rabbitMqSettings = configuration.GetSection(RabbitMQSettings.SectionName).Get<RabbitMQSettings>()
             ?? new RabbitMQSettings();
 
-        services.AddMassTransit(config =>
+        if (rabbitMqSettings.Enabled)
         {
-            config.UsingRabbitMq((context, cfg) =>
+            services.AddMassTransit(config =>
             {
-                cfg.Host(rabbitMqSettings.Host, rabbitMqSettings.VirtualHost, h =>
+                config.UsingRabbitMq((context, cfg) =>
                 {
-                    h.Username(rabbitMqSettings.Username);
-                    h.Password(rabbitMqSettings.Password);
-                });
+                    cfg.Host(rabbitMqSettings.Host, rabbitMqSettings.VirtualHost, h =>
+                    {
+                        h.Username(rabbitMqSettings.Username);
+                        h.Password(rabbitMqSettings.Password);
+                    });
 
-                cfg.ConfigureEndpoints(context);
+                    cfg.ConfigureEndpoints(context);
+                });
             });
-        });
+        }
+        else
+        {
+            // Use in-memory transport for standalone development
+            services.AddMassTransit(config =>
+            {
+                config.UsingInMemory((context, cfg) =>
+                {
+                    cfg.ConfigureEndpoints(context);
+                });
+            });
+        }
 
         return services;
     }
@@ -165,11 +178,11 @@ public static class ServiceCollectionExtensions
         })
         .AddStandardResilienceHandler();
 
-        // Stock Service Client
-        services.AddHttpClient<IStockServiceClient, StockServiceClient>(client =>
+        // Material Service Client
+        services.AddHttpClient<IMaterialServiceClient, MaterialServiceClient>(client =>
         {
-            client.BaseAddress = new Uri(settings.StockService.BaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(settings.StockService.TimeoutInSeconds);
+            client.BaseAddress = new Uri(settings.MaterialService.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(settings.MaterialService.TimeoutInSeconds);
         })
         .AddStandardResilienceHandler();
 
