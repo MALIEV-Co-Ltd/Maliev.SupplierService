@@ -18,6 +18,10 @@ on:
         type: string
         default: "Perform comprehensive code review"
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   ai-code-review:
     runs-on: ubuntu-latest
