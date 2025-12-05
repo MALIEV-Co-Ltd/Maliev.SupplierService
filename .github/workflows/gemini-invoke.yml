@@ -1,128 +1,122 @@
-name: Gemini AI - General Assistance
+name: '▶️ Gemini Invoke'
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
-      action_type:
-        description: "Type of assistance needed"
-        required: true
-        type: choice
-        options:
-          - "code_assistance"
-          - "documentation"
-          - "testing"
-          - "refactoring"
-          - "debugging"
-        default: "code_assistance"
-
-      target:
-        description: "Target file, class, or component"
+      additional_context:
+        type: 'string'
+        description: 'Any additional context from the request'
         required: false
-        type: string
 
-      prompt:
-        description: "Specific request or question"
-        required: true
-        type: string
+concurrency:
+  group: '${{ github.workflow }}-invoke-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}'
+  cancel-in-progress: false
 
-  issue_comment:
-    types: [created]
+defaults:
+  run:
+    shell: 'bash'
 
 jobs:
-  ai-assistance:
-    runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issue_comment' &&
-       contains(github.event.comment.body, '@gemini') &&
-       github.event.issue.state == 'open')
-
+  invoke:
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+      issues: 'write'
+      pull-requests: 'write'
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+      - name: 'Mint identity token'
+        id: 'mint_identity_token'
+        if: |-
+          ${{ vars.APP_ID }}
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
         with:
-          dotnet-version: "9.x"
+          app-id: '${{ vars.APP_ID }}'
+          private-key: '${{ secrets.APP_PRIVATE_KEY }}'
+          permission-contents: 'read'
+          permission-issues: 'write'
+          permission-pull-requests: 'write'
 
-      - name: Parse request
-        id: parse_request
-        run: |
-          if [ "${{ github.event_name }}" = "issue_comment" ]; then
-            COMMENT_BODY="${{ github.event.comment.body }}"
-            ACTION_TYPE=$(echo "$COMMENT_BODY" | grep -oP '@gemini\s+\K\w+' || echo "code_assistance")
-            PROMPT=$(echo "$COMMENT_BODY" | sed 's/@gemini\s*[a-zA-Z]*\s*//')
-            TARGET="${{ github.event.issue.number }}"
-          else
-            ACTION_TYPE="${{ github.event.inputs.action_type }}"
-            PROMPT="${{ github.event.inputs.prompt }}"
-            TARGET="${{ github.event.inputs.target }}"
-          fi
-
-          echo "action_type=$ACTION_TYPE" >> $GITHUB_OUTPUT
-          echo "prompt=$PROMPT" >> $GITHUB_OUTPUT
-          echo "target=$TARGET" >> $GITHUB_OUTPUT
-
-      - name: Analyze codebase
-        run: |
-          echo "Analyzing Maliev.SupplierService codebase..."
-          find . -name "*.cs" -type f | head -20
-          echo "Solution structure:"
-          if [ -f "Maliev.SupplierService.sln" ]; then
-            dotnet sln list
-          fi
-
-      - name: Generate AI response
-        id: ai_response
-        run: |
-          # Simulate AI processing based on action type
-          case "${{ steps.parse_request.outputs.action_type }}" in
-            "code_assistance")
-              RESPONSE="AI Analysis for code assistance request: ${{ steps.parse_request.outputs.prompt }}"
-              ;;
-            "documentation")
-              RESPONSE="AI-generated documentation suggestions for: ${{ steps.parse_request.outputs.target }}"
-              ;;
-            "testing")
-              RESPONSE="AI recommendations for testing: ${{ steps.parse_request.outputs.prompt }}"
-              ;;
-            "refactoring")
-              RESPONSE="AI refactoring suggestions for: ${{ steps.parse_request.outputs.target }}"
-              ;;
-            "debugging")
-              RESPONSE="AI debugging assistance for: ${{ steps.parse_request.outputs.prompt }}"
-              ;;
-            *)
-              RESPONSE="AI general assistance: ${{ steps.parse_request.outputs.prompt }}"
-              ;;
-          esac
-
-          echo "response<<EOF" >> $GITHUB_OUTPUT
-          echo "$RESPONSE" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Post response to issue
-        if: github.event_name == 'issue_comment'
-        run: |
-          gh issue comment ${{ steps.parse_request.outputs.target }} --body "🤖 **Gemini AI Response**
-
-          **Request Type:** ${{ steps.parse_request.outputs.action_type }}
-
-          **Analysis:**
-          ${{ steps.ai_response.outputs.response }}
-
-          **Context:** Maliev.SupplierService microservice
-          **Timestamp:** $(date)
-
-          *This response was generated by the Gemini AI workflow.*"
+      - name: 'Run Gemini CLI'
+        id: 'run_gemini'
+        uses: 'google-github-actions/run-gemini-cli@main' # ratchet:exclude
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Log AI assistance
-        run: |
-          echo "AI Assistance Completed:"
-          echo "- Action Type: ${{ steps.parse_request.outputs.action_type }}"
-          echo "- Target: ${{ steps.parse_request.outputs.target }}"
-          echo "- Prompt: ${{ steps.parse_request.outputs.prompt }}"
-          echo "- Response: ${{ steps.ai_response.outputs.response }}"
+          TITLE: '${{ github.event.pull_request.title || github.event.issue.title }}'
+          DESCRIPTION: '${{ github.event.pull_request.body || github.event.issue.body }}'
+          EVENT_NAME: '${{ github.event_name }}'
+          GITHUB_TOKEN: '${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}'
+          IS_PULL_REQUEST: '${{ !!github.event.pull_request }}'
+          ISSUE_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
+          REPOSITORY: '${{ github.repository }}'
+          ADDITIONAL_CONTEXT: '${{ inputs.additional_context }}'
+        with:
+          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          gemini_cli_version: '${{ vars.GEMINI_CLI_VERSION }}'
+          gemini_debug: '${{ fromJSON(vars.DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}'
+          gemini_model: '${{ vars.GEMINI_MODEL }}'
+          google_api_key: '${{ secrets.GOOGLE_API_KEY }}'
+          use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
+          use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
+          upload_artifacts: '${{ vars.UPLOAD_ARTIFACTS }}'
+          workflow_name: 'gemini-invoke'
+          settings: |-
+            {
+              "model": {
+                "maxSessionTurns": 25
+              },
+              "telemetry": {
+                "enabled": true,
+                "target": "local",
+                "outfile": ".gemini/telemetry.log"
+              },
+              "mcpServers": {
+                "github": {
+                  "command": "docker",
+                  "args": [
+                    "run",
+                    "-i",
+                    "--rm",
+                    "-e",
+                    "GITHUB_PERSONAL_ACCESS_TOKEN",
+                    "ghcr.io/github/github-mcp-server:v0.18.0"
+                  ],
+                  "includeTools": [
+                    "add_issue_comment",
+                    "get_issue",
+                    "get_issue_comments",
+                    "list_issues",
+                    "search_issues",
+                    "create_pull_request",
+                    "pull_request_read",
+                    "list_pull_requests",
+                    "search_pull_requests",
+                    "create_branch",
+                    "create_or_update_file",
+                    "delete_file",
+                    "fork_repository",
+                    "get_commit",
+                    "get_file_contents",
+                    "list_commits",
+                    "push_files",
+                    "search_code"
+                  ],
+                  "env": {
+                    "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+                  }
+                }
+              },
+              "tools": {
+                "core": [
+                  "run_shell_command(cat)",
+                  "run_shell_command(echo)",
+                  "run_shell_command(grep)",
+                  "run_shell_command(head)",
+                  "run_shell_command(tail)"
+                ]
+              }
+            }
+          prompt: '/gemini-invoke'

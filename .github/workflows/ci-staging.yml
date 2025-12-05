@@ -38,6 +38,7 @@ jobs:
       - name: Configure Docker for Google Cloud
         run: gcloud auth configure-docker asia-southeast1-docker.pkg.dev
 
+
       - name: Build and push Docker image
         run: |
           docker build \
