@@ -76,7 +76,7 @@ dotnet run --project Maliev.SupplierService.Api/Maliev.SupplierService.Api.cspro
 ```json
 {
   "ConnectionStrings": {
-    "ServiceDbContext": "Host=localhost;Port=5432;Database=supplier_app_db;Username=postgres;Password=postgres"
+    "SupplierDbContext": "Host=localhost;Port=5432;Database=supplier_app_db;Username=postgres;Password=postgres"
   },
   "Jwt": {
     "PublicKey": "<base64-encoded-public-key>",
