@@ -8,8 +8,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Maliev.SupplierService.Api.Controllers;
 
+/// <summary>
+/// Controller for managing supplier contacts.
+/// </summary>
 [ApiController]
-[ApiVersion("1")]
+[ApiVersion("1.0")]
 [Route("suppliers/v{version:apiVersion}/suppliers/{supplierId:guid}/contacts")]
 [Authorize]
 public class SupplierContactsController : ControllerBase
@@ -18,6 +21,12 @@ public class SupplierContactsController : ControllerBase
     private readonly IValidator<CreateContactRequest> _createValidator;
     private readonly ILogger<SupplierContactsController> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SupplierContactsController"/> class.
+    /// </summary>
+    /// <param name="supplierService">The supplier service.</param>
+    /// <param name="createValidator">The validator for contact creation requests.</param>
+    /// <param name="logger">The logger.</param>
     public SupplierContactsController(
         ISupplierService supplierService,
         IValidator<CreateContactRequest> createValidator,
@@ -53,11 +62,7 @@ public class SupplierContactsController : ControllerBase
         {
             var contact = await _supplierService.AddContactAsync(
                 supplierId,
-                request.Name,
-                request.Email,
-                request.Role,
-                request.Phone,
-                false, // isPrimary - set via separate endpoint
+                request,
                 userId,
                 userName,
                 cancellationToken);

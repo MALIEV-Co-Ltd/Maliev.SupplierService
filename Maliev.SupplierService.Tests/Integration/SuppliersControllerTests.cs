@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using FluentAssertions;
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
 using Maliev.SupplierService.Data.Enums;
@@ -15,7 +14,7 @@ public class SuppliersControllerTests : BaseIntegrationTest
     {
     }
 
-    [Fact(Skip = "Known EF Core concurrency issue - needs investigation")]
+    [Fact]
     public async Task CreateSupplier_WithValidData_Returns201AndSupplier()
     {
         // Arrange
@@ -47,14 +46,14 @@ public class SuppliersControllerTests : BaseIntegrationTest
         }
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
         var supplier = await GetResponseAsync<SupplierResponse>(response);
-        supplier.Should().NotBeNull();
-        supplier!.CompanyName.Should().Be("Acme Corporation");
-        supplier.TaxId.Should().Be("ACME123456");
-        supplier.Status.Should().Be(SupplierStatus.PendingApproval);
-        supplier.Id.Should().NotBeEmpty();
+        Assert.NotNull(supplier);
+        Assert.Equal("Acme Corporation", supplier!.CompanyName);
+        Assert.Equal("ACME123456", supplier.TaxId);
+        Assert.Equal(SupplierStatus.PendingApproval, supplier.Status);
+        Assert.NotEqual(Guid.Empty, supplier.Id);
     }
 
     [Fact]
@@ -79,7 +78,7 @@ public class SuppliersControllerTests : BaseIntegrationTest
         var response = await Client.PostAsJsonAsync("/suppliers/v1/suppliers", request);
 
         // Assert - InvalidOperationException maps to BadRequest in the middleware
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -102,7 +101,7 @@ public class SuppliersControllerTests : BaseIntegrationTest
         var response = await Client.PostAsJsonAsync("/suppliers/v1/suppliers", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -115,12 +114,12 @@ public class SuppliersControllerTests : BaseIntegrationTest
         var response = await Client.GetAsync($"/suppliers/v1/suppliers/{supplier.Id}");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var result = await GetResponseAsync<SupplierDetailResponse>(response);
-        result.Should().NotBeNull();
-        result!.Id.Should().Be(supplier.Id);
-        result.CompanyName.Should().Be("Get Test Company");
+        Assert.NotNull(result);
+        Assert.Equal(supplier.Id, result!.Id);
+        Assert.Equal("Get Test Company", result.CompanyName);
     }
 
     [Fact]
@@ -133,7 +132,7 @@ public class SuppliersControllerTests : BaseIntegrationTest
         var response = await Client.GetAsync($"/suppliers/v1/suppliers/{nonExistingId}");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -148,13 +147,13 @@ public class SuppliersControllerTests : BaseIntegrationTest
         var response = await Client.GetAsync("/suppliers/v1/suppliers?page=1&pageSize=2");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var result = await GetResponseAsync<SupplierListResponse>(response);
-        result.Should().NotBeNull();
-        result!.Items.Should().HaveCount(2);
-        result.TotalCount.Should().Be(3);
-        result.TotalPages.Should().Be(2);
+        Assert.NotNull(result);
+        Assert.Equal(2, result!.Items.Count);
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(2, result.TotalPages);
     }
 
     [Fact]
@@ -168,12 +167,12 @@ public class SuppliersControllerTests : BaseIntegrationTest
         var response = await Client.GetAsync("/suppliers/v1/suppliers?status=Active");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var result = await GetResponseAsync<SupplierListResponse>(response);
-        result.Should().NotBeNull();
-        result!.Items.Should().HaveCount(1);
-        result.Items[0].CompanyName.Should().Be("Active Company");
+        Assert.NotNull(result);
+        Assert.Single(result!.Items);
+        Assert.Equal("Active Company", result.Items[0].CompanyName);
     }
 
     [Fact]
@@ -186,11 +185,11 @@ public class SuppliersControllerTests : BaseIntegrationTest
         var response = await Client.DeleteAsync($"/suppliers/v1/suppliers/{supplier.Id}");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
         // Verify deleted
         var getResponse = await Client.GetAsync($"/suppliers/v1/suppliers/{supplier.Id}");
-        getResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
     }
 
     [Fact]
@@ -218,10 +217,10 @@ public class SuppliersControllerTests : BaseIntegrationTest
         var response = await Client.PutAsJsonAsync($"/suppliers/v1/suppliers/{supplier.Id}", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var result = await GetResponseAsync<SupplierResponse>(response);
-        result!.CompanyName.Should().Be("Updated Company Name");
+        Assert.Equal("Updated Company Name", result!.CompanyName);
     }
 
     [Fact]
@@ -239,9 +238,9 @@ public class SuppliersControllerTests : BaseIntegrationTest
         var response = await Client.PatchAsJsonAsync($"/suppliers/v1/suppliers/{supplier.Id}/status", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var result = await GetResponseAsync<SupplierResponse>(response);
-        result!.Status.Should().Be(SupplierStatus.Active);
+        Assert.Equal(SupplierStatus.Active, result!.Status);
     }
 }
