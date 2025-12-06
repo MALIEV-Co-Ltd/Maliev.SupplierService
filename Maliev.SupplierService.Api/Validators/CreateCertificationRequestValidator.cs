@@ -3,8 +3,15 @@ using Maliev.SupplierService.Api.DTOs.Requests;
 
 namespace Maliev.SupplierService.Api.Validators;
 
+/// <summary>
+/// Validator for <see cref="CreateCertificationRequest"/> objects.
+/// </summary>
 public class CreateCertificationRequestValidator : AbstractValidator<CreateCertificationRequest>
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CreateCertificationRequestValidator"/> class.
+    /// Defines validation rules for properties of <see cref="CreateCertificationRequest"/>.
+    /// </summary>
     public CreateCertificationRequestValidator()
     {
         RuleFor(x => x.DocumentType)

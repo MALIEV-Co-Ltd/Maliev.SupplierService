@@ -1,7 +1,9 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Security.Cryptography;
 using Maliev.SupplierService.Api.Services;
 using Maliev.SupplierService.Data;
 using MassTransit;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -10,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
+using Microsoft.IdentityModel.Tokens;
 using StackExchange.Redis;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
@@ -20,10 +23,10 @@ namespace Maliev.SupplierService.Tests.Integration.Infrastructure;
 public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgresContainer = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
-        .WithDatabase("supplier_test_db")
-        .WithUsername("test_user")
-        .WithPassword("test_password")
+        .WithImage("postgres:18")
+        .WithDatabase("supplier_test")
+        .WithUsername("postgres")
+        .WithPassword("postgres")
         .Build();
 
     private readonly RedisContainer _redisContainer = new RedisBuilder()
@@ -35,6 +38,16 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
         .WithUsername("guest")
         .WithPassword("guest")
         .Build();
+
+    private readonly RSA _testRsa;
+    private const string TestIssuer = "test-issuer";
+    private const string TestAudience = "test-audience";
+
+    public IntegrationTestWebAppFactory()
+    {
+        // Generate ephemeral RSA key for test JWT tokens
+        _testRsa = RSA.Create(2048);
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -96,14 +109,21 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
                 cfg.SetTestTimeouts(testInactivityTimeout: TimeSpan.FromSeconds(5));
             });
 
-            // Configure test authentication
-            services.AddAuthentication(options =>
+            // PostConfigure JWT Bearer options to use our test RSA key
+            services.PostConfigureAll<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>(options =>
             {
-                options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
-                options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
-            })
-            .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
-                TestAuthHandler.SchemeName, _ => { });
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = TestIssuer,
+                    ValidAudience = TestAudience,
+                    IssuerSigningKey = new RsaSecurityKey(_testRsa),
+                    ClockSkew = TimeSpan.Zero // No clock skew for tests
+                };
+            });
         });
 
         builder.UseEnvironment("Testing");
@@ -131,7 +151,54 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
         await _redisContainer.DisposeAsync();
         await _rabbitMqContainer.DisposeAsync();
 
+        _testRsa.Dispose();
         await base.DisposeAsync();
+    }
+
+    /// <summary>
+    /// Creates a test JWT token with specified claims for integration testing.
+    /// </summary>
+    /// <param name="userId">User ID claim</param>
+    /// <param name="roles">User roles</param>
+    /// <param name="additionalClaims">Additional claims to include</param>
+    /// <returns>JWT token string</returns>
+    public string CreateTestJwtToken(string userId = "test-user", string[]? roles = null, Dictionary<string, string>? additionalClaims = null)
+    {
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, userId),
+            new(JwtRegisteredClaimNames.Sub, userId),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+        };
+
+        // Add roles
+        roles ??= new[] { "Admin" };
+        foreach (var role in roles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+        }
+
+        // Add additional claims
+        if (additionalClaims != null)
+        {
+            foreach (var (key, value) in additionalClaims)
+            {
+                claims.Add(new Claim(key, value));
+            }
+        }
+
+        var credentials = new SigningCredentials(
+            new RsaSecurityKey(_testRsa),
+            SecurityAlgorithms.RsaSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: TestIssuer,
+            audience: TestAudience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddHours(1),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
 

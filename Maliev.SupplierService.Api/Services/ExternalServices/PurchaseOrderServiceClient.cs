@@ -2,17 +2,31 @@ using System.Net.Http.Json;
 
 namespace Maliev.SupplierService.Api.Services.ExternalServices;
 
+/// <summary>
+/// Client for interacting with the external Purchase Order Service.
+/// </summary>
 public class PurchaseOrderServiceClient : IPurchaseOrderServiceClient
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<PurchaseOrderServiceClient> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PurchaseOrderServiceClient"/> class.
+    /// </summary>
+    /// <param name="httpClient">The HTTP client used for making requests.</param>
+    /// <param name="logger">The logger instance.</param>
     public PurchaseOrderServiceClient(HttpClient httpClient, ILogger<PurchaseOrderServiceClient> logger)
     {
         _httpClient = httpClient;
         _logger = logger;
     }
 
+    /// <summary>
+    /// Checks if there are any existing purchase orders referencing the specified supplier in the Purchase Order Service.
+    /// </summary>
+    /// <param name="supplierId">The unique identifier of the supplier to check.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <returns>A <see cref="DependencyCheckResult"/> indicating whether references exist and any associated messages.</returns>
     public async Task<DependencyCheckResult> CheckReferencesAsync(Guid supplierId, CancellationToken cancellationToken = default)
     {
         try

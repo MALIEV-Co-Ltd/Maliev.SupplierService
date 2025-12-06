@@ -18,6 +18,12 @@ jobs:
         with:
           dotnet-version: "10.x"
 
+      - name: Switch to PackageReference for CI build
+        run: |
+          # Replace ProjectReference with PackageReference in all service csproj files
+          find . -name "*.csproj" -type f -exec sed -i 's|<ProjectReference Include=".*Maliev.Aspire.ServiceDefaults.*.csproj" />|<PackageReference Include="Maliev.Aspire.ServiceDefaults" Version="1.0.*" />|g' {} \;
+          echo "Switched to PackageReference for ServiceDefaults"
+
       - name: Restore dependencies
         run: dotnet restore Maliev.SupplierService.sln
         env:
@@ -43,15 +49,8 @@ jobs:
       - name: Build and push Docker image
         run: |
           gcloud auth configure-docker asia-southeast1-docker.pkg.dev
-          docker build \
-            --secret id=nuget_username,env=NUGET_USERNAME \
-            --secret id=nuget_password,env=NUGET_PASSWORD \
-            -t asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-dev/maliev-supplier-service:${{ github.sha }} \
-            -f Maliev.SupplierService.Api/Dockerfile .
+          NUGET_USERNAME=${{ github.actor }} NUGET_PASSWORD=${{ secrets.GITOPS_PAT }} docker build --secret id=nuget_username,env=NUGET_USERNAME --secret id=nuget_password,env=NUGET_PASSWORD -t asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-dev/maliev-supplier-service:${{ github.sha }} -f Maliev.SupplierService.Api/Dockerfile .
           docker push asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-dev/maliev-supplier-service:${{ github.sha }}
-        env:
-          NUGET_USERNAME: ${{ github.actor }}
-          NUGET_PASSWORD: ${{ secrets.GITOPS_PAT }}
 
       - name: Checkout maliev-gitops repository
         uses: actions/checkout@v5
@@ -70,12 +69,33 @@ jobs:
           cd maliev-gitops/3-apps/maliev-supplier-service/overlays/development
           kustomize edit set image asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact/maliev-supplier-service=asia-southeast1-docker.pkg.dev/maliev-website/maliev-website-artifact-dev/maliev-supplier-service:${{ github.sha }}
 
-      - name: Commit and push changes
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITOPS_PAT }}
+          PR_BODY: |
+            Automated deployment of supplier-service to development environment.
+
+            Commit: ${{ github.sha }}
+            Triggered by: ${{ github.actor }}
+            Workflow: ${{ github.workflow }}
         run: |
           cd maliev-gitops
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+          # Create a new branch for this update
+          BRANCH_NAME="supplier-service/dev-${{ github.sha }}"
+          git checkout -b $BRANCH_NAME
+
+          # Commit and push changes to the new branch
           git add .
-          git commit -m "Update supplier-service image to ${{ github.sha }}" || exit 0
-          git pull --rebase origin $(git branch --show-current) || true
-          git push
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git commit -m "Update supplier-service image to ${{ github.sha }}"
+          git push origin $BRANCH_NAME
+
+          # Create pull request using GitHub CLI
+          gh pr create             --title "Deploy supplier-service ${{ github.sha }} to development"             --body "$PR_BODY"             --base main             --head $BRANCH_NAME             --repo MALIEV-Co-Ltd/maliev-gitops

@@ -4,8 +4,9 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <UserSecretsId>supplier-service-dev</UserSecretsId>
+    <UserSecretsId>maliev-supplierservice-api</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -32,20 +33,13 @@
 
     <!-- HTTP Resilience -->
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.0.0" />
-
-    <!-- Logging -->
-    <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
-    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
-
+    
     <!-- API Versioning -->
     <PackageReference Include="Asp.Versioning.Http" Version="8.1.0" />
     <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="8.1.0" />
 
-    <!-- Metrics -->
-    <PackageReference Include="prometheus-net.AspNetCore" Version="8.2.1" />
-
     <!-- Aspire ServiceDefaults (from GitHub Packages) -->
-    <PackageReference Include="Maliev.Aspire.ServiceDefaults" Version="1.0.*" />
+    <ProjectReference Include="..\..\Maliev.Aspire\Maliev.Aspire.ServiceDefaults\Maliev.Aspire.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>

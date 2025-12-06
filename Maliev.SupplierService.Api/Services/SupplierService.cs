@@ -1,3 +1,4 @@
+using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.Events;
 using Maliev.SupplierService.Data;
 using Maliev.SupplierService.Data.Entities;
@@ -7,6 +8,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.SupplierService.Api.Services;
 
+/// <summary>
+/// Implements the core business logic and operations for managing suppliers.
+/// </summary>
 public class SupplierService : ISupplierService
 {
     private readonly SupplierDbContext _context;
@@ -15,6 +19,14 @@ public class SupplierService : ISupplierService
     private readonly IPublishEndpoint _publishEndpoint;
     private readonly ILogger<SupplierService> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SupplierService"/> class.
+    /// </summary>
+    /// <param name="context">The database context for supplier data.</param>
+    /// <param name="cacheService">The caching service.</param>
+    /// <param name="auditService">The audit logging service.</param>
+    /// <param name="publishEndpoint">The MassTransit publish endpoint for events.</param>
+    /// <param name="logger">The logger instance.</param>
     public SupplierService(
         SupplierDbContext context,
         ICacheService cacheService,
@@ -29,6 +41,23 @@ public class SupplierService : ISupplierService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Creates a new supplier asynchronously.
+    /// </summary>
+    /// <param name="companyName">The legal name of the supplier company.</param>
+    /// <param name="taxId">The tax identification number of the supplier.</param>
+    /// <param name="address">The street address of the supplier.</param>
+    /// <param name="city">The city where the supplier is located.</param>
+    /// <param name="country">The country where the supplier is located.</param>
+    /// <param name="postalCode">The postal code for the supplier's address.</param>
+    /// <param name="materialCategoryIds">A collection of IDs for the material categories the supplier provides.</param>
+    /// <param name="capabilities">A list of the supplier's capabilities or services.</param>
+    /// <param name="primaryContact">Optional primary contact for the supplier.</param>
+    /// <param name="userId">The ID of the user creating the supplier.</param>
+    /// <param name="userName">The name of the user creating the supplier.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <returns>The newly created <see cref="Supplier"/> entity.</returns>
+    /// <exception cref="InvalidOperationException">Thrown if a supplier with the given TaxId already exists.</exception>
     public async Task<Supplier> CreateAsync(
         string companyName,
         string taxId,
@@ -38,6 +67,7 @@ public class SupplierService : ISupplierService
         string? postalCode,
         IEnumerable<Guid>? materialCategoryIds,
         IEnumerable<string>? capabilities,
+        CreateContactRequest? primaryContact,
         string userId,
         string userName,
         CancellationToken cancellationToken = default)
@@ -48,7 +78,7 @@ public class SupplierService : ISupplierService
 
         if (existingSupplier is not null)
         {
-            throw new InvalidOperationException($"Supplier with TaxId '{taxId}' already exists.");
+            throw new InvalidOperationException("Supplier with this TaxId already exists.");
         }
 
         var supplier = new Supplier
@@ -92,6 +122,21 @@ public class SupplierService : ISupplierService
             }
         }
 
+        // Add primary contact if provided
+        if (primaryContact is not null)
+        {
+            supplier.Contacts.Add(new SupplierContact
+            {
+                Id = Guid.NewGuid(),
+                SupplierId = supplier.Id,
+                Name = primaryContact.Name,
+                Email = primaryContact.Email,
+                Role = primaryContact.Role,
+                Phone = primaryContact.Phone,
+                IsPrimary = true
+            });
+        }
+
         // Add initial onboarding status
         supplier.OnboardingHistory.Add(new OnboardingStatus
         {
@@ -106,17 +151,17 @@ public class SupplierService : ISupplierService
         _context.Suppliers.Add(supplier);
         await _context.SaveChangesAsync(cancellationToken);
 
-        // Skip audit log - TODO: Re-enable after fixing concurrency issue
-        // await _auditService.LogChangeAsync(
-        //     supplier.Id,
-        //     "CREATE",
-        //     nameof(Supplier),
-        //     supplier.Id,
-        //     null,
-        //     new { supplier.Id, supplier.CompanyName, supplier.TaxId, supplier.Address, supplier.City, supplier.Country, supplier.PostalCode, supplier.Status, supplier.OnboardingStage },
-        //     userId,
-        //     userName,
-        //     cancellationToken);
+        // Log audit for supplier creation
+        await _auditService.LogChangeAsync(
+            supplier.Id,
+            "CREATE",
+            nameof(Supplier),
+            supplier.Id,
+            null,
+            new { supplier.Id, supplier.CompanyName, supplier.TaxId },
+            userId,
+            userName,
+            cancellationToken);
 
         // Invalidate cache
         await _cacheService.InvalidateByTagAsync("suppliers", cancellationToken);
@@ -135,13 +180,12 @@ public class SupplierService : ISupplierService
         return supplier;
     }
 
+    /// <summary>
+    /// Retrieves a supplier by its unique identifier asynchronously.
+    /// </summary>
     public async Task<SupplierContact> AddContactAsync(
         Guid supplierId,
-        string name,
-        string email,
-        string? role,
-        string? phone,
-        bool isPrimary,
+        CreateContactRequest request,
         string userId,
         string userName,
         CancellationToken cancellationToken = default)
@@ -152,11 +196,11 @@ public class SupplierService : ISupplierService
 
         if (supplier is null)
         {
-            throw new InvalidOperationException($"Supplier with ID '{supplierId}' not found.");
+            throw new InvalidOperationException("Supplier not found.");
         }
 
         // If setting as primary, unset other primary contacts
-        if (isPrimary)
+        if (request.IsPrimary)
         {
             foreach (var existingContact in supplier.Contacts.Where(c => c.IsPrimary))
             {
@@ -168,11 +212,11 @@ public class SupplierService : ISupplierService
         {
             Id = Guid.NewGuid(),
             SupplierId = supplierId,
-            Name = name,
-            Email = email,
-            Role = role,
-            Phone = phone,
-            IsPrimary = isPrimary
+            Name = request.Name,
+            Email = request.Email,
+            Role = request.Role,
+            Phone = request.Phone,
+            IsPrimary = request.IsPrimary
         };
 
         supplier.Contacts.Add(contact);
@@ -198,6 +242,9 @@ public class SupplierService : ISupplierService
         return contact;
     }
 
+    /// <param name="id">The unique identifier of the supplier.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <returns>The <see cref="Supplier"/> entity if found; otherwise, <c>null</c>.</returns>
     public async Task<Supplier?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var cacheKey = $"supplier:{id}";
@@ -224,6 +271,12 @@ public class SupplierService : ISupplierService
         return supplier;
     }
 
+    /// <summary>
+    /// Validates if a supplier exists and is active asynchronously.
+    /// </summary>
+    /// <param name="id">The unique identifier of the supplier to validate.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <returns>A tuple indicating whether the supplier is valid and the <see cref="Supplier"/> entity if found.</returns>
     public async Task<(bool IsValid, Supplier? Supplier)> ValidateSupplierAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var supplier = await _context.Suppliers
@@ -238,6 +291,12 @@ public class SupplierService : ISupplierService
         return (true, supplier);
     }
 
+    /// <summary>
+    /// Checks a supplier's eligibility for certain operations (e.g., participating in purchase orders) asynchronously.
+    /// </summary>
+    /// <param name="id">The unique identifier of the supplier.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <returns>A tuple indicating whether the supplier is eligible and a list of reasons for ineligibility.</returns>
     public async Task<(bool IsEligible, IReadOnlyList<string> Reasons)> CheckEligibilityAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var supplier = await _context.Suppliers
@@ -272,6 +331,11 @@ public class SupplierService : ISupplierService
         return (reasons.Count == 0, reasons);
     }
 
+    /// <summary>
+    /// Retrieves a read-only list of all available material categories asynchronously.
+    /// </summary>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <returns>A read-only list of <see cref="MaterialCategory"/> entities.</returns>
     public async Task<IReadOnlyList<MaterialCategory>> GetMaterialCategoriesAsync(CancellationToken cancellationToken = default)
     {
         var cacheKey = "material-categories";
@@ -292,6 +356,24 @@ public class SupplierService : ISupplierService
         return categories;
     }
 
+    /// <summary>
+    /// Updates an existing supplier's information asynchronously.
+    /// </summary>
+    /// <param name="id">The unique identifier of the supplier to update.</param>
+    /// <param name="companyName">The updated legal name of the supplier company.</param>
+    /// <param name="address">The updated street address of the supplier.</param>
+    /// <param name="city">The updated city where the supplier is located.</param>
+    /// <param name="country">The updated country where the supplier is located.</param>
+    /// <param name="postalCode">The updated postal code for the supplier's address.</param>
+    /// <param name="materialCategoryIds">An updated collection of IDs for the material categories the supplier provides.</param>
+    /// <param name="capabilities">An updated list of the supplier's capabilities or services.</param>
+    /// <param name="rowVersion">The row version for optimistic concurrency control.</param>
+    /// <param name="userId">The ID of the user updating the supplier.</param>
+    /// <param name="userName">The name of the user updating the supplier.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <returns>The updated <see cref="Supplier"/> entity.</returns>
+    /// <exception cref="InvalidOperationException">Thrown if the supplier is not found.</exception>
+    /// <exception cref="DbUpdateConcurrencyException">Thrown if a concurrency conflict occurs.</exception>
     public async Task<Supplier> UpdateAsync(
         Guid id,
         string? companyName,
@@ -313,7 +395,7 @@ public class SupplierService : ISupplierService
 
         if (supplier is null)
         {
-            throw new InvalidOperationException($"Supplier with ID '{id}' not found.");
+            throw new InvalidOperationException("Supplier not found.");
         }
 
         // Check optimistic concurrency using UpdatedAt ticks
@@ -417,6 +499,17 @@ public class SupplierService : ISupplierService
         return supplier;
     }
 
+    /// <summary>
+    /// Updates the status of an existing supplier asynchronously.
+    /// </summary>
+    /// <param name="id">The unique identifier of the supplier.</param>
+    /// <param name="newStatus">The new status to apply to the supplier.</param>
+    /// <param name="reason">An optional reason for the status change.</param>
+    /// <param name="userId">The ID of the user updating the status.</param>
+    /// <param name="userName">The name of the user updating the status.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <returns>The updated <see cref="Supplier"/> entity.</returns>
+    /// <exception cref="InvalidOperationException">Thrown if the supplier is not found.</exception>
     public async Task<Supplier> UpdateStatusAsync(
         Guid id,
         SupplierStatus newStatus,
@@ -430,7 +523,7 @@ public class SupplierService : ISupplierService
 
         if (supplier is null)
         {
-            throw new InvalidOperationException($"Supplier with ID '{id}' not found.");
+            throw new InvalidOperationException("Supplier not found.");
         }
 
         var oldStatus = supplier.Status;
@@ -466,6 +559,15 @@ public class SupplierService : ISupplierService
         return supplier;
     }
 
+    /// <summary>
+    /// Updates specific metadata for a supplier asynchronously, typically used for external service callbacks.
+    /// </summary>
+    /// <param name="id">The unique identifier of the supplier.</param>
+    /// <param name="lastOrderDate">The date of the supplier's last order.</param>
+    /// <param name="totalOrderValue">The total value of all orders from the supplier.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    /// <exception cref="InvalidOperationException">Thrown if the supplier is not found.</exception>
     public async Task UpdateMetadataAsync(
         Guid id,
         DateTime? lastOrderDate,
@@ -477,7 +579,7 @@ public class SupplierService : ISupplierService
 
         if (supplier is null)
         {
-            throw new InvalidOperationException($"Supplier with ID '{id}' not found.");
+            throw new InvalidOperationException("Supplier not found.");
         }
 
         if (lastOrderDate.HasValue)
@@ -497,6 +599,19 @@ public class SupplierService : ISupplierService
         _logger.LogDebug("Updated metadata for supplier {SupplierId}", supplier.Id);
     }
 
+    /// <summary>
+    /// Retrieves a paginated list of suppliers asynchronously based on various filtering and sorting criteria.
+    /// </summary>
+    /// <param name="page">The page number for pagination (1-based).</param>
+    /// <param name="pageSize">The number of items per page.</param>
+    /// <param name="status">An optional filter for the supplier's status.</param>
+    /// <param name="categoryId">An optional filter for the material category ID.</param>
+    /// <param name="capability">An optional filter for a specific supplier capability.</param>
+    /// <param name="search">A search term to filter suppliers by name, tax ID, or other fields.</param>
+    /// <param name="sortBy">The field to sort the results by.</param>
+    /// <param name="sortOrder">The sort order ('asc' or 'desc').</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <returns>A tuple containing a read-only list of <see cref="Supplier"/> entities and the total count.</returns>
     public async Task<(IReadOnlyList<Supplier> Items, int TotalCount)> ListSuppliersAsync(
         int page,
         int pageSize,
@@ -573,6 +688,21 @@ public class SupplierService : ISupplierService
         return (items, totalCount);
     }
 
+    /// <summary>
+    /// Adds a new certification to a supplier asynchronously.
+    /// </summary>
+    /// <param name="supplierId">The unique identifier of the supplier.</param>
+    /// <param name="documentType">The type of certification document.</param>
+    /// <param name="documentName">The name or title of the certification document.</param>
+    /// <param name="issueDate">The date the certification was issued.</param>
+    /// <param name="expirationDate">The optional expiration date of the certification.</param>
+    /// <param name="externalFileRef">An optional external reference or URL to the certification file.</param>
+    /// <param name="notes">Optional notes or comments about the certification.</param>
+    /// <param name="userId">The ID of the user adding the certification.</param>
+    /// <param name="userName">The name of the user adding the certification.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <returns>The newly created <see cref="SupplierCertification"/> entity.</returns>
+    /// <exception cref="InvalidOperationException">Thrown if the supplier is not found.</exception>
     public async Task<SupplierCertification> AddCertificationAsync(
         Guid supplierId,
         CertificationType documentType,
@@ -590,7 +720,7 @@ public class SupplierService : ISupplierService
 
         if (supplier is null)
         {
-            throw new InvalidOperationException($"Supplier with ID '{supplierId}' not found.");
+            throw new InvalidOperationException("Supplier not found.");
         }
 
         var certification = new SupplierCertification
@@ -628,6 +758,16 @@ public class SupplierService : ISupplierService
         return certification;
     }
 
+    /// <summary>
+    /// Deletes a specific certification from a supplier asynchronously.
+    /// </summary>
+    /// <param name="supplierId">The unique identifier of the supplier.</param>
+    /// <param name="certificationId">The unique identifier of the certification to delete.</param>
+    /// <param name="userId">The ID of the user deleting the certification.</param>
+    /// <param name="userName">The name of the user deleting the certification.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    /// <exception cref="InvalidOperationException">Thrown if the certification or supplier is not found.</exception>
     public async Task DeleteCertificationAsync(
         Guid supplierId,
         Guid certificationId,
@@ -640,7 +780,7 @@ public class SupplierService : ISupplierService
 
         if (certification is null)
         {
-            throw new InvalidOperationException($"Certification with ID '{certificationId}' not found for supplier '{supplierId}'.");
+            throw new InvalidOperationException("Certification not found for supplier.");
         }
 
         _context.SupplierCertifications.Remove(certification);
@@ -658,12 +798,24 @@ public class SupplierService : ISupplierService
             userName,
             cancellationToken);
 
-        // Invalidate cache
-        await _cacheService.RemoveAsync($"supplier:{supplierId}", cancellationToken);
+                // Invalidate cache
 
-        _logger.LogInformation("Deleted certification {CertificationId} from supplier {SupplierId}", certificationId, supplierId);
-    }
+                await _cacheService.RemoveAsync($"supplier:{supplierId}", cancellationToken);
 
+        
+
+                _logger.LogInformation("Deleted certification {CertificationId} from supplier {SupplierId}", certificationId, supplierId);
+
+            }
+
+        
+
+            /// <summary>
+    /// Retrieves a read-only list of certifications that are expiring within a specified threshold asynchronously.
+    /// </summary>
+    /// <param name="daysThreshold">The number of days within which a certification is considered expiring soon.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <returns>A read-only list of tuples containing the <see cref="SupplierCertification"/>, its associated <see cref="Supplier"/>, and the remaining days until expiration.</returns>
     public async Task<IReadOnlyList<(SupplierCertification Certification, Supplier Supplier, int DaysUntilExpiration)>> GetExpiringCertificationsAsync(
         int daysThreshold,
         CancellationToken cancellationToken = default)
@@ -685,6 +837,19 @@ public class SupplierService : ISupplierService
             .ToList();
     }
 
+    /// <summary>
+    /// Adds a new performance evaluation for a supplier asynchronously.
+    /// </summary>
+    /// <param name="supplierId">The unique identifier of the supplier.</param>
+    /// <param name="category">The category of the performance evaluation.</param>
+    /// <param name="score">The score given in the evaluation.</param>
+    /// <param name="comments">Optional comments or feedback for the evaluation.</param>
+    /// <param name="evaluationDate">The date the evaluation was conducted.</param>
+    /// <param name="userId">The ID of the user adding the evaluation.</param>
+    /// <param name="userName">The name of the user adding the evaluation.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <returns>The newly created <see cref="PerformanceEvaluation"/> entity.</returns>
+    /// <exception cref="InvalidOperationException">Thrown if the supplier is not found.</exception>
     public async Task<PerformanceEvaluation> AddEvaluationAsync(
         Guid supplierId,
         PerformanceRatingCategory category,
@@ -700,7 +865,7 @@ public class SupplierService : ISupplierService
 
         if (supplier is null)
         {
-            throw new InvalidOperationException($"Supplier with ID '{supplierId}' not found.");
+            throw new InvalidOperationException("Supplier not found.");
         }
 
         var evaluation = new PerformanceEvaluation
@@ -738,6 +903,12 @@ public class SupplierService : ISupplierService
         return evaluation;
     }
 
+    /// <summary>
+    /// Retrieves a read-only list of all performance evaluations for a specific supplier asynchronously.
+    /// </summary>
+    /// <param name="supplierId">The unique identifier of the supplier.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <returns>A read-only list of <see cref="PerformanceEvaluation"/> entities.</returns>
     public async Task<IReadOnlyList<PerformanceEvaluation>> GetEvaluationsAsync(
         Guid supplierId,
         CancellationToken cancellationToken = default)
@@ -749,6 +920,17 @@ public class SupplierService : ISupplierService
             .ToListAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Advances the onboarding stage of a supplier asynchronously.
+    /// </summary>
+    /// <param name="supplierId">The unique identifier of the supplier.</param>
+    /// <param name="targetStage">The target onboarding stage to transition the supplier to.</param>
+    /// <param name="notes">Optional notes or comments related to the stage transition.</param>
+    /// <param name="userId">The ID of the user advancing the onboarding stage.</param>
+    /// <param name="userName">The name of the user advancing the onboarding stage.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <returns>The updated <see cref="Supplier"/> entity.</returns>
+    /// <exception cref="InvalidOperationException">Thrown if the supplier is not found or the transition is invalid.</exception>
     public async Task<Supplier> AdvanceOnboardingAsync(
         Guid supplierId,
         OnboardingStage targetStage,
@@ -762,7 +944,7 @@ public class SupplierService : ISupplierService
 
         if (supplier is null)
         {
-            throw new InvalidOperationException($"Supplier with ID '{supplierId}' not found.");
+            throw new InvalidOperationException("Supplier not found.");
         }
 
         if (!OnboardingTransitions.IsValidTransition(supplier.OnboardingStage, targetStage))
@@ -815,6 +997,12 @@ public class SupplierService : ISupplierService
         return supplier;
     }
 
+    /// <summary>
+    /// Retrieves the onboarding history for a specific supplier asynchronously.
+    /// </summary>
+    /// <param name="supplierId">The unique identifier of the supplier.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <returns>A read-only list of <see cref="OnboardingStatus"/> entities representing the history.</returns>
     public async Task<IReadOnlyList<OnboardingStatus>> GetOnboardingHistoryAsync(
         Guid supplierId,
         CancellationToken cancellationToken = default)
@@ -826,6 +1014,16 @@ public class SupplierService : ISupplierService
             .ToListAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Retrieves the audit trail for a specific supplier asynchronously.
+    /// </summary>
+    /// <param name="supplierId">The unique identifier of the supplier.</param>
+    /// <param name="startDate">Optional: The start date for filtering audit log entries.</param>
+    /// <param name="endDate">Optional: The end date for filtering audit log entries.</param>
+    /// <param name="page">The page number for pagination (1-based).</param>
+    /// <param name="pageSize">The number of items per page.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <returns>A tuple containing a read-only list of <see cref="SupplierAuditLog"/> entities and the total count.</returns>
     public async Task<(IReadOnlyList<SupplierAuditLog> Items, int TotalCount)> GetAuditTrailAsync(
         Guid supplierId,
         DateTime? startDate,
@@ -859,6 +1057,15 @@ public class SupplierService : ISupplierService
         return (items, totalCount);
     }
 
+    /// <summary>
+    /// Deletes a supplier asynchronously.
+    /// </summary>
+    /// <param name="id">The unique identifier of the supplier to delete.</param>
+    /// <param name="userId">The ID of the user deleting the supplier.</param>
+    /// <param name="userName">The name of the user deleting the supplier.</param>
+    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    /// <exception cref="InvalidOperationException">Thrown if the supplier is not found.</exception>
     public async Task DeleteAsync(
         Guid id,
         string userId,
@@ -870,7 +1077,7 @@ public class SupplierService : ISupplierService
 
         if (supplier is null)
         {
-            throw new InvalidOperationException($"Supplier with ID '{id}' not found.");
+            throw new InvalidOperationException("Supplier not found.");
         }
 
         // Log audit before deletion

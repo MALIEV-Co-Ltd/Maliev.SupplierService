@@ -7,8 +7,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Maliev.SupplierService.Api.Controllers;
 
+/// <summary>
+/// Controller for managing the supplier onboarding process.
+/// </summary>
 [ApiController]
-[ApiVersion("1")]
+[ApiVersion("1.0")]
 [Route("suppliers/v{version:apiVersion}/suppliers/{supplierId:guid}/onboarding")]
 [Authorize]
 public class SupplierOnboardingController : ControllerBase
@@ -16,6 +19,11 @@ public class SupplierOnboardingController : ControllerBase
     private readonly ISupplierService _supplierService;
     private readonly ILogger<SupplierOnboardingController> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SupplierOnboardingController"/> class.
+    /// </summary>
+    /// <param name="supplierService">The supplier service.</param>
+    /// <param name="logger">The logger.</param>
     public SupplierOnboardingController(
         ISupplierService supplierService,
         ILogger<SupplierOnboardingController> logger)

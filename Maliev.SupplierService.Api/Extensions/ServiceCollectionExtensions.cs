@@ -13,8 +13,17 @@ using StackExchange.Redis;
 
 namespace Maliev.SupplierService.Api.Extensions;
 
+/// <summary>
+/// Provides extension methods for configuring services in the <see cref="IServiceCollection"/>.
+/// </summary>
 public static class ServiceCollectionExtensions
 {
+    /// <summary>
+    /// Adds core supplier-related services, configuration, database contexts, validators, and business services.
+    /// </summary>
+    /// <param name="services">The <see cref="IServiceCollection"/> to add the services to.</param>
+    /// <param name="configuration">The application's configuration.</param>
+    /// <returns>The <see cref="IServiceCollection"/> for chaining.</returns>
     public static IServiceCollection AddSupplierServices(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -25,15 +34,7 @@ public static class ServiceCollectionExtensions
         services.Configure<RabbitMQSettings>(configuration.GetSection(RabbitMQSettings.SectionName));
         services.Configure<ExternalServicesSettings>(configuration.GetSection(ExternalServicesSettings.SectionName));
 
-        // Database - with DbContextFactory for scenarios needing separate instances
-        services.AddDbContextFactory<SupplierDbContext>(options =>
-        {
-            options.UseNpgsql(configuration.GetConnectionString("ServiceDbContext"));
-        });
-        services.AddDbContext<SupplierDbContext>(options =>
-        {
-            options.UseNpgsql(configuration.GetConnectionString("ServiceDbContext"));
-        });
+        // Note: Database is now configured via builder.AddPostgresDbContext<SupplierDbContext>() in Program.cs
 
         // FluentValidation
         services.AddValidatorsFromAssemblyContaining<Program>();
@@ -46,12 +47,31 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>
+    /// Adds JWT authentication to the service collection, configuring JWT bearer options.
+    /// </summary>
+    /// <param name="services">The <see cref="IServiceCollection"/> to add the services to.</param>
+    /// <param name="configuration">The application's configuration.</param>
+    /// <returns>The <see cref="IServiceCollection"/> for chaining.</returns>
     public static IServiceCollection AddJwtAuthentication(
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var jwtSettings = configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()
-            ?? new JwtSettings();
+        var jwtPublicKey = configuration["Jwt:PublicKey"] ?? throw new InvalidOperationException("Jwt:PublicKey not found");
+        var jwtIssuer = configuration["Jwt:Issuer"] ?? throw new InvalidOperationException("Jwt:Issuer not found");
+        var jwtAudience = configuration["Jwt:Audience"] ?? throw new InvalidOperationException("Jwt:Audience not found");
+
+        // Parse RSA public key
+        var rsa = System.Security.Cryptography.RSA.Create();
+        try
+        {
+            var publicKeyPem = Encoding.UTF8.GetString(Convert.FromBase64String(jwtPublicKey));
+            rsa.ImportFromPem(publicKeyPem);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException("Invalid JWT public key format", ex);
+        }
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
@@ -59,14 +79,13 @@ public static class ServiceCollectionExtensions
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
-                    ValidIssuer = jwtSettings.Issuer,
+                    ValidIssuer = jwtIssuer,
                     ValidateAudience = true,
-                    ValidAudience = jwtSettings.Audience,
+                    ValidAudience = jwtAudience,
                     ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(
-                        Encoding.UTF8.GetBytes(jwtSettings.PublicKey)),
+                    IssuerSigningKey = new RsaSecurityKey(rsa),
                     ValidateLifetime = true,
-                    ClockSkew = TimeSpan.Zero
+                    ClockSkew = TimeSpan.FromMinutes(5)
                 };
             });
 
@@ -75,39 +94,56 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>
+    /// Configures and adds Redis caching services, with a fallback to in-memory cache if Redis is disabled.
+    /// </summary>
+    /// <param name="services">The <see cref="IServiceCollection"/> to add the services to.</param>
+    /// <param name="configuration">The application's configuration.</param>
+    /// <returns>The <see cref="IServiceCollection"/> for chaining.</returns>
     public static IServiceCollection AddRedisCache(
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var redisSettings = configuration.GetSection(RedisSettings.SectionName).Get<RedisSettings>()
-            ?? new RedisSettings();
+        var redisConnectionString = configuration.GetConnectionString("redis")
+            ?? throw new InvalidOperationException("Redis connection string not found. Expected 'ConnectionStrings:redis'");
 
-        if (redisSettings.Enabled)
-        {
-            services.AddSingleton<IConnectionMultiplexer>(sp =>
-                ConnectionMultiplexer.Connect(redisSettings.ConnectionString));
+        services.AddSingleton<IConnectionMultiplexer>(sp =>
+            ConnectionMultiplexer.Connect(redisConnectionString));
 
-            services.AddStackExchangeRedisCache(options =>
-            {
-                options.Configuration = redisSettings.ConnectionString;
-            });
-        }
-        else
+        services.AddStackExchangeRedisCache(options =>
         {
-            services.AddDistributedMemoryCache();
-        }
+            options.Configuration = redisConnectionString;
+        });
 
         return services;
     }
 
+    /// <summary>
+    /// Configures and adds MassTransit with RabbitMQ, with a fallback to in-memory transport for development/testing.
+    /// </summary>
+    /// <param name="services">The <see cref="IServiceCollection"/> to add the services to.</param>
+    /// <param name="configuration">The application's configuration.</param>
+    /// <returns>The <see cref="IServiceCollection"/> for chaining.</returns>
     public static IServiceCollection AddMassTransitWithRabbitMq(
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        var rabbitmqConnectionString = configuration.GetConnectionString("rabbitmq");
         var rabbitMqSettings = configuration.GetSection(RabbitMQSettings.SectionName).Get<RabbitMQSettings>()
             ?? new RabbitMQSettings();
 
-        if (rabbitMqSettings.Enabled)
+        if (!string.IsNullOrEmpty(rabbitmqConnectionString))
+        {
+            services.AddMassTransit(config =>
+            {
+                config.UsingRabbitMq((context, cfg) =>
+                {
+                    cfg.Host(rabbitmqConnectionString);
+                    cfg.ConfigureEndpoints(context);
+                });
+            });
+        }
+        else if (rabbitMqSettings.Enabled)
         {
             services.AddMassTransit(config =>
             {
@@ -138,6 +174,11 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>
+    /// Adds and configures API versioning, including API explorer support for documentation generation.
+    /// </summary>
+    /// <param name="services">The <see cref="IServiceCollection"/> to add the services to.</param>
+    /// <returns>The <see cref="IServiceCollection"/> for chaining.</returns>
     public static IServiceCollection AddApiVersioningConfiguration(this IServiceCollection services)
     {
         services.AddApiVersioning(options =>
@@ -155,6 +196,12 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>
+    /// Adds HTTP clients for external services with configured base addresses, timeouts, and standard resilience policies.
+    /// </summary>
+    /// <param name="services">The <see cref="IServiceCollection"/> to add the services to.</param>
+    /// <param name="configuration">The application's configuration.</param>
+    /// <returns>The <see cref="IServiceCollection"/> for chaining.</returns>
     public static IServiceCollection AddExternalServiceClients(
         this IServiceCollection services,
         IConfiguration configuration)

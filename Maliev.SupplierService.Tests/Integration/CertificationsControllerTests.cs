@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using FluentAssertions;
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
 using Maliev.SupplierService.Data.Enums;
@@ -35,13 +34,13 @@ public class CertificationsControllerTests : BaseIntegrationTest
             $"/suppliers/v1/suppliers/{supplier.Id}/certifications", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
         var result = await GetResponseAsync<CertificationResponse>(response);
-        result.Should().NotBeNull();
-        result!.DocumentName.Should().Be("Business License 2024");
-        result.IsExpired.Should().BeFalse();
-        result.IsExpiringSoon.Should().BeFalse();
+        Assert.NotNull(result);
+        Assert.Equal("Business License 2024", result!.DocumentName);
+        Assert.False(result.IsExpired);
+        Assert.False(result.IsExpiringSoon);
     }
 
     [Fact]
@@ -64,10 +63,10 @@ public class CertificationsControllerTests : BaseIntegrationTest
             $"/suppliers/v1/suppliers/{supplier.Id}/certifications", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
         var result = await GetResponseAsync<CertificationResponse>(response);
-        result!.IsExpired.Should().BeTrue();
+        Assert.True(result!.IsExpired);
     }
 
     [Fact]
@@ -88,7 +87,7 @@ public class CertificationsControllerTests : BaseIntegrationTest
             $"/suppliers/v1/suppliers/{Guid.NewGuid()}/certifications", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -125,13 +124,13 @@ public class CertificationsControllerTests : BaseIntegrationTest
         var response = await Client.GetAsync("/suppliers/v1/certifications/expiring?days=30");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var result = await GetResponseAsync<ExpiringCertificationsListResponse>(response);
-        result.Should().NotBeNull();
-        result!.Items.Should().HaveCount(1);
-        result.Items[0].DocumentName.Should().Be("Expiring Insurance");
-        result.Items[0].DaysUntilExpiration.Should().BeLessThanOrEqualTo(30);
+        Assert.NotNull(result);
+        Assert.Single(result!.Items);
+        Assert.Equal("Expiring Insurance", result.Items[0].DocumentName);
+        Assert.True(result.Items[0].DaysUntilExpiration <= 30);
     }
 
     [Fact]
@@ -158,6 +157,6 @@ public class CertificationsControllerTests : BaseIntegrationTest
             $"/suppliers/v1/suppliers/{supplier.Id}/certifications/{certification!.Id}");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 }

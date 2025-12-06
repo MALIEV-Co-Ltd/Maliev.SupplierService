@@ -1,233 +1,214 @@
-name: Gemini AI - Scheduled Triage
+name: '📋 Gemini Scheduled Issue Triage'
 
 on:
   schedule:
-    # Run every day at 9 AM UTC (Monday to Friday)
-    - cron: '0 9 * * 1-5'
-
+    - cron: '0 * * * *' # Runs every hour
+  pull_request:
+    branches:
+      - 'main'
+      - 'release/**/*'
+    paths:
+      - '.github/workflows/gemini-scheduled-triage.yml'
+  push:
+    branches:
+      - 'main'
+      - 'release/**/*'
+    paths:
+      - '.github/workflows/gemini-scheduled-triage.yml'
   workflow_dispatch:
-    inputs:
-      scope:
-        description: 'Triage scope'
-        required: false
-        type: choice
-        options:
-          - 'all_issues'
-          - 'unlabeled_issues'
-          - 'stale_issues'
-          - 'high_priority'
-        default: 'unlabeled_issues'
 
-      days_back:
-        description: 'Days to look back for issues'
-        required: false
-        type: string
-        default: '7'
+concurrency:
+  group: '${{ github.workflow }}'
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: 'bash'
 
 jobs:
-  scheduled-maintenance:
-    runs-on: ubuntu-latest
-
+  triage:
+    runs-on: 'ubuntu-latest'
+    timeout-minutes: 7
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+      issues: 'read'
+      pull-requests: 'read'
+    outputs:
+      available_labels: '${{ steps.get_labels.outputs.available_labels }}'
+      triaged_issues: '${{ env.TRIAGED_ISSUES }}'
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v5
+      - name: 'Get repository labels'
+        id: 'get_labels'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea' # ratchet:actions/github-script@v7.0.1
+        with:
+          # NOTE: we intentionally do not use the minted token. The default
+          # GITHUB_TOKEN provided by the action has enough permissions to read
+          # the labels.
+          script: |-
+            const labels = [];
+            for await (const response of github.paginate.iterator(github.rest.issues.listLabelsForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100, // Maximum per page to reduce API calls
+            })) {
+              labels.push(...response.data);
+            }
 
-    - name: Setup parameters
-      id: setup
-      run: |
-        SCOPE="${{ github.event.inputs.scope || 'unlabeled_issues' }}"
-        DAYS_BACK="${{ github.event.inputs.days_back || '7' }}"
-        DATE_THRESHOLD=$(date -d "$DAYS_BACK days ago" '+%Y-%m-%d')
+            if (!labels || labels.length === 0) {
+              core.setFailed('There are no issue labels in this repository.')
+            }
 
-        echo "scope=$SCOPE" >> $GITHUB_OUTPUT
-        echo "days_back=$DAYS_BACK" >> $GITHUB_OUTPUT
-        echo "date_threshold=$DATE_THRESHOLD" >> $GITHUB_OUTPUT
+            const labelNames = labels.map(label => label.name).sort();
+            core.setOutput('available_labels', labelNames.join(','));
+            core.info(`Found ${labelNames.length} labels: ${labelNames.join(', ')}`);
+            return labelNames;
 
-    - name: Identify issues for triage
-      id: identify_issues
-      run: |
-        SCOPE="${{ steps.setup.outputs.scope }}"
-        DATE_THRESHOLD="${{ steps.setup.outputs.date_threshold }}"
+      - name: 'Find untriaged issues'
+        id: 'find_issues'
+        env:
+          GITHUB_REPOSITORY: '${{ github.repository }}'
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN || github.token }}'
+        run: |-
+          echo '🔍 Finding unlabeled issues and issues marked for triage...'
+          ISSUES="$(gh issue list \
+            --state 'open' \
+            --search 'no:label label:"status/needs-triage"' \
+            --json number,title,body \
+            --limit '100' \
+            --repo "${GITHUB_REPOSITORY}"
+          )"
 
-        case "$SCOPE" in
-          "unlabeled_issues")
-            ISSUES=$(gh issue list --state open --limit 100 --json number,labels | jq -r '.[] | select(.labels | length == 0) | .number')
-            ;;
-          "stale_issues")
-            ISSUES=$(gh issue list --state open --limit 100 --json number,updatedAt | jq -r --arg date "$DATE_THRESHOLD" '.[] | select(.updatedAt < ($date + "T00:00:00Z")) | .number')
-            ;;
-          "high_priority")
-            ISSUES=$(gh issue list --state open --limit 100 --label "priority:high" --json number | jq -r '.[].number')
-            ;;
-          *)
-            ISSUES=$(gh issue list --state open --limit 50 --json number | jq -r '.[].number')
-            ;;
-        esac
+          echo '📝 Setting output for GitHub Actions...'
+          echo "issues_to_triage=${ISSUES}" >> "${GITHUB_OUTPUT}"
 
-        echo "issues<<EOF" >> $GITHUB_OUTPUT
-        echo "$ISSUES" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
+          ISSUE_COUNT="$(echo "${ISSUES}" | jq 'length')"
+          echo "✅ Found ${ISSUE_COUNT} issue(s) to triage! 🎯"
 
-        ISSUE_COUNT=$(echo "$ISSUES" | wc -l)
-        echo "issue_count=$ISSUE_COUNT" >> $GITHUB_OUTPUT
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: 'Run Gemini Issue Analysis'
+        id: 'gemini_issue_analysis'
+        if: |-
+          ${{ steps.find_issues.outputs.issues_to_triage != '[]' }}
+        uses: 'google-github-actions/run-gemini-cli@main' # ratchet:exclude
+        env:
+          GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
+          ISSUES_TO_TRIAGE: '${{ steps.find_issues.outputs.issues_to_triage }}'
+          REPOSITORY: '${{ github.repository }}'
+          AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
+        with:
+          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          gemini_cli_version: '${{ vars.GEMINI_CLI_VERSION }}'
+          gemini_debug: '${{ fromJSON(vars.DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}'
+          gemini_model: '${{ vars.GEMINI_MODEL }}'
+          google_api_key: '${{ secrets.GOOGLE_API_KEY }}'
+          use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
+          use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
+          upload_artifacts: '${{ vars.UPLOAD_ARTIFACTS }}'
+          workflow_name: 'gemini-scheduled-triage'
+          settings: |-
+            {
+              "model": {
+                "maxSessionTurns": 25
+              },
+              "telemetry": {
+                "enabled": true,
+                "target": "local",
+                "outfile": ".gemini/telemetry.log"
+              },
+              "tools": {
+                "core": [
+                  "run_shell_command(echo)",
+                  "run_shell_command(jq)",
+                  "run_shell_command(printenv)"
+                ]
+              }
+            }
+          prompt: '/gemini-scheduled-triage'
 
-    - name: Process issues
-      id: process_issues
-      run: |
-        ISSUES="${{ steps.identify_issues.outputs.issues }}"
-        PROCESSED_COUNT=0
-        TRIAGE_SUMMARY=""
+  label:
+    runs-on: 'ubuntu-latest'
+    needs:
+      - 'triage'
+    if: |-
+      needs.triage.outputs.available_labels != '' &&
+      needs.triage.outputs.available_labels != '[]' &&
+      needs.triage.outputs.triaged_issues != '' &&
+      needs.triage.outputs.triaged_issues != '[]'
+    permissions:
+      contents: 'read'
+      issues: 'write'
+      pull-requests: 'write'
+    steps:
+      - name: 'Mint identity token'
+        id: 'mint_identity_token'
+        if: |-
+          ${{ vars.APP_ID }}
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
+        with:
+          app-id: '${{ vars.APP_ID }}'
+          private-key: '${{ secrets.APP_PRIVATE_KEY }}'
+          permission-contents: 'read'
+          permission-issues: 'write'
+          permission-pull-requests: 'write'
 
-        if [ -z "$ISSUES" ] || [ "$ISSUES" = "" ]; then
-          echo "No issues found for processing"
-          echo "processed_count=0" >> $GITHUB_OUTPUT
-          echo "triage_summary=No issues found matching criteria" >> $GITHUB_OUTPUT
-          exit 0
-        fi
+      - name: 'Apply labels'
+        env:
+          AVAILABLE_LABELS: '${{ needs.triage.outputs.available_labels }}'
+          TRIAGED_ISSUES: '${{ needs.triage.outputs.triaged_issues }}'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea' # ratchet:actions/github-script@v7.0.1
+        with:
+          # Use the provided token so that the "gemini-cli" is the actor in the
+          # log for what changed the labels.
+          github-token: '${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}'
+          script: |-
+            // Parse the available labels
+            const availableLabels = (process.env.AVAILABLE_LABELS || '').split(',')
+              .map((label) => label.trim())
+              .sort()
 
-        while IFS= read -r issue_number; do
-          if [ -n "$issue_number" ] && [ "$issue_number" != "null" ]; then
-            echo "Processing issue #$issue_number"
+            // Parse out the triaged issues
+            const triagedIssues = (JSON.parse(process.env.TRIAGED_ISSUES || '{}'))
+              .sort((a, b) => a.issue_number - b.issue_number)
 
-            # Get issue details
-            ISSUE_INFO=$(gh issue view $issue_number --json title,body,labels,state)
-            TITLE=$(echo "$ISSUE_INFO" | jq -r '.title')
-            BODY=$(echo "$ISSUE_INFO" | jq -r '.body // ""')
-            LABELS=$(echo "$ISSUE_INFO" | jq -r '.labels[].name' | tr '\n' ',' | sed 's/,$//')
-            STATE=$(echo "$ISSUE_INFO" | jq -r '.state')
+            core.debug(`Triaged issues: ${JSON.stringify(triagedIssues)}`);
 
-            if [ "$STATE" != "OPEN" ]; then
-              continue
-            fi
+            // Iterate over each label
+            for (const issue of triagedIssues) {
+              if (!issue) {
+                core.debug(`Skipping empty issue: ${JSON.stringify(issue)}`);
+                continue;
+              }
 
-            # Simple triage logic
-            NEEDS_ATTENTION=false
+              const issueNumber = issue.issue_number;
+              if (!issueNumber) {
+                core.debug(`Skipping issue with no data: ${JSON.stringify(issue)}`);
+                continue;
+              }
 
-            # Check if issue has no labels
-            if [ -z "$LABELS" ]; then
-              NEEDS_ATTENTION=true
-              REASON="No labels assigned"
-            fi
+              // Extract and reject invalid labels - we do this just in case
+              // someone was able to prompt inject malicious labels.
+              let labelsToSet = (issue.labels_to_set || [])
+                .map((label) => label.trim())
+                .filter((label) => availableLabels.includes(label))
+                .sort()
 
-            # Check for urgent keywords
-            if echo "$TITLE $BODY" | grep -iE "(critical|urgent|blocking|production|security)" > /dev/null; then
-              NEEDS_ATTENTION=true
-              REASON="Contains urgent keywords"
-            fi
+              core.debug(`Identified labels to set: ${JSON.stringify(labelsToSet)}`);
 
-            if [ "$NEEDS_ATTENTION" = true ]; then
-              # Add attention-needed label
-              gh issue edit $issue_number --add-label "needs-triage" || echo "Could not add label"
+              if (labelsToSet.length === 0) {
+                core.info(`Skipping issue #${issueNumber} - no labels to set.`)
+                continue;
+              }
 
-              TRIAGE_SUMMARY="$TRIAGE_SUMMARY\n- Issue #$issue_number: $REASON"
-              PROCESSED_COUNT=$((PROCESSED_COUNT + 1))
-            fi
+              core.debug(`Setting labels on issue #${issueNumber} to ${labelsToSet.join(', ')} (${issue.explanation || 'no explanation'})`)
 
-            # Rate limiting
-            sleep 1
-          fi
-        done <<< "$ISSUES"
-
-        echo "processed_count=$PROCESSED_COUNT" >> $GITHUB_OUTPUT
-        echo "triage_summary<<EOF" >> $GITHUB_OUTPUT
-        echo "$TRIAGE_SUMMARY" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Check repository health
-      id: repo_health
-      run: |
-        # Count open issues by type
-        TOTAL_OPEN=$(gh issue list --state open --limit 1000 | wc -l)
-        UNLABELED=$(gh issue list --state open --limit 1000 --json number,labels | jq '[.[] | select(.labels | length == 0)] | length')
-        HIGH_PRIORITY=$(gh issue list --state open --label "priority:high" --limit 1000 | wc -l)
-        BUGS=$(gh issue list --state open --label "bug" --limit 1000 | wc -l)
-
-        # Check for stale issues (no activity in 30 days)
-        STALE_DATE=$(date -d "30 days ago" '+%Y-%m-%d')
-        STALE_ISSUES=$(gh issue list --state open --limit 1000 --json number,updatedAt | jq -r --arg date "$STALE_DATE" '[.[] | select(.updatedAt < ($date + "T00:00:00Z"))] | length')
-
-        echo "total_open=$TOTAL_OPEN" >> $GITHUB_OUTPUT
-        echo "unlabeled=$UNLABELED" >> $GITHUB_OUTPUT
-        echo "high_priority=$HIGH_PRIORITY" >> $GITHUB_OUTPUT
-        echo "bugs=$BUGS" >> $GITHUB_OUTPUT
-        echo "stale_issues=$STALE_ISSUES" >> $GITHUB_OUTPUT
-
-        # Generate health recommendations
-        RECOMMENDATIONS=""
-        if [ "$UNLABELED" -gt 5 ]; then
-          RECOMMENDATIONS="$RECOMMENDATIONS\n- Consider labeling $UNLABELED unlabeled issues"
-        fi
-        if [ "$HIGH_PRIORITY" -gt 10 ]; then
-          RECOMMENDATIONS="$RECOMMENDATIONS\n- High number of high-priority issues ($HIGH_PRIORITY) - review priorities"
-        fi
-        if [ "$STALE_ISSUES" -gt 20 ]; then
-          RECOMMENDATIONS="$RECOMMENDATIONS\n- $STALE_ISSUES stale issues detected - consider closing or updating"
-        fi
-
-        echo "recommendations<<EOF" >> $GITHUB_OUTPUT
-        echo "$RECOMMENDATIONS" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Create maintenance report
-      run: |
-        # Create a maintenance report issue
-        REPORT_DATE=$(date '+%Y-%m-%d')
-        REPORT_TITLE="🤖 Daily Maintenance Report - $REPORT_DATE"
-
-        REPORT_BODY="## Maliev.SupplierService - Daily Maintenance Report
-
-        **Date:** $REPORT_DATE
-        **Scope:** ${{ steps.setup.outputs.scope }}
-        **Period:** Last ${{ steps.setup.outputs.days_back }} days
-
-        ### 📊 Repository Health
-        - **Total Open Issues:** ${{ steps.repo_health.outputs.total_open }}
-        - **Unlabeled Issues:** ${{ steps.repo_health.outputs.unlabeled }}
-        - **High Priority Issues:** ${{ steps.repo_health.outputs.high_priority }}
-        - **Bug Reports:** ${{ steps.repo_health.outputs.bugs }}
-        - **Stale Issues (30+ days):** ${{ steps.repo_health.outputs.stale_issues }}
-
-        ### 🔄 Triage Actions
-        **Issues Processed:** ${{ steps.process_issues.outputs.processed_count }}
-
-        ${{ steps.process_issues.outputs.triage_summary }}
-
-        ### 💡 Recommendations
-        ${{ steps.repo_health.outputs.recommendations }}
-
-        ### 🎯 Service-Specific Notes
-        - Monitor supplier integration endpoints
-        - Review performance metrics for data processing
-        - Check authentication service dependencies
-        - Validate database migration status
-
-        ---
-        *This report was generated automatically by the Gemini AI scheduled triage workflow.*"
-
-        # Only create report if there's significant activity or it's Monday
-        CURRENT_DAY=$(date '+%u')  # 1=Monday, 7=Sunday
-        PROCESSED_COUNT=${{ steps.process_issues.outputs.processed_count }}
-
-        if [ "$CURRENT_DAY" = "1" ] || [ "$PROCESSED_COUNT" -gt 0 ]; then
-          gh issue create \
-            --title "$REPORT_TITLE" \
-            --body "$REPORT_BODY" \
-            --label "maintenance,automated" || echo "Could not create maintenance report"
-        fi
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Log maintenance completion
-      run: |
-        echo "Scheduled Maintenance Completed:"
-        echo "- Scope: ${{ steps.setup.outputs.scope }}"
-        echo "- Issues Identified: ${{ steps.identify_issues.outputs.issue_count }}"
-        echo "- Issues Processed: ${{ steps.process_issues.outputs.processed_count }}"
-        echo "- Total Open Issues: ${{ steps.repo_health.outputs.total_open }}"
-        echo "- Timestamp: $(date)"
+              await github.rest.issues.setLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                labels: labelsToSet,
+              });
+            }

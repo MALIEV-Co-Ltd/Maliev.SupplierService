@@ -53,6 +53,9 @@ public class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
         builder.Property(e => e.LastOrderDate)
             .HasColumnName("last_order_date");
 
+        builder.Property(e => e.TotalOrderValue)
+            .HasColumnName("total_order_value");
+
         builder.Property(e => e.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

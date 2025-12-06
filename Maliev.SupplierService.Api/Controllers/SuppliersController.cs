@@ -2,6 +2,7 @@ using Asp.Versioning;
 using FluentValidation;
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
+using Maliev.SupplierService.Api.Mapping;
 using Maliev.SupplierService.Api.Services;
 using Maliev.SupplierService.Data.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -9,8 +10,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Maliev.SupplierService.Api.Controllers;
 
+/// <summary>
+/// Main controller for managing supplier information.
+/// </summary>
 [ApiController]
-[ApiVersion("1")]
+[ApiVersion("1.0")]
 [Route("suppliers/v{version:apiVersion}/suppliers")]
 [Authorize]
 public class SuppliersController : ControllerBase
@@ -19,6 +23,12 @@ public class SuppliersController : ControllerBase
     private readonly IValidator<CreateSupplierRequest> _createValidator;
     private readonly ILogger<SuppliersController> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SuppliersController"/> class.
+    /// </summary>
+    /// <param name="supplierService">The supplier service.</param>
+    /// <param name="createValidator">The validator for supplier creation requests.</param>
+    /// <param name="logger">The logger.</param>
     public SuppliersController(
         ISupplierService supplierService,
         IValidator<CreateSupplierRequest> createValidator,
@@ -58,26 +68,12 @@ public class SuppliersController : ControllerBase
             request.PostalCode,
             request.MaterialCategoryIds,
             request.Capabilities,
+            request.PrimaryContact,
             userId,
             userName,
             cancellationToken);
 
-        // Add primary contact if provided
-        if (request.PrimaryContact is not null)
-        {
-            await _supplierService.AddContactAsync(
-                supplier.Id,
-                request.PrimaryContact.Name,
-                request.PrimaryContact.Email,
-                request.PrimaryContact.Role,
-                request.PrimaryContact.Phone,
-                true, // isPrimary
-                userId,
-                userName,
-                cancellationToken);
-        }
-
-        var response = MapToResponse(supplier);
+        var response = supplier.ToSupplierResponse();
 
         _logger.LogInformation("Created supplier {SupplierId}", supplier.Id);
 
@@ -113,7 +109,7 @@ public class SuppliersController : ControllerBase
         var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
 
         var response = new SupplierListResponse(
-            items.Select(MapToResponse).ToList(),
+            items.Select(s => s.ToSupplierResponse()).ToList(),
             totalCount,
             page,
             pageSize,
@@ -139,7 +135,7 @@ public class SuppliersController : ControllerBase
             return NotFound(new { message = $"Supplier with ID {id} not found" });
         }
 
-        var response = MapToDetailResponse(supplier);
+        var response = supplier.ToSupplierDetailResponse();
         return Ok(response);
     }
 
@@ -241,7 +237,7 @@ public class SuppliersController : ControllerBase
                 userName,
                 cancellationToken);
 
-            return Ok(MapToResponse(supplier));
+            return Ok(supplier.ToSupplierResponse());
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
         {
@@ -277,7 +273,7 @@ public class SuppliersController : ControllerBase
                 userName,
                 cancellationToken);
 
-            return Ok(MapToResponse(supplier));
+            return Ok(supplier.ToSupplierResponse());
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
         {
@@ -334,53 +330,5 @@ public class SuppliersController : ControllerBase
         {
             return NotFound(new { message = ex.Message });
         }
-    }
-
-    private static SupplierResponse MapToResponse(Supplier supplier)
-    {
-        return new SupplierResponse(
-            supplier.Id,
-            supplier.CompanyName,
-            supplier.TaxId,
-            supplier.Address,
-            supplier.City,
-            supplier.Country,
-            supplier.PostalCode,
-            supplier.Status,
-            supplier.OnboardingStage,
-            supplier.CreatedAt,
-            supplier.UpdatedAt,
-            supplier.UpdatedAt.Ticks.ToString());
-    }
-
-    private static SupplierDetailResponse MapToDetailResponse(Supplier supplier)
-    {
-        return new SupplierDetailResponse(
-            supplier.Id,
-            supplier.CompanyName,
-            supplier.TaxId,
-            supplier.Address,
-            supplier.City,
-            supplier.Country,
-            supplier.PostalCode,
-            supplier.Status,
-            supplier.OnboardingStage,
-            supplier.CreatedAt,
-            supplier.UpdatedAt,
-            supplier.UpdatedAt.Ticks.ToString(),
-            supplier.Contacts.Select(c => new ContactResponse(
-                c.Id, c.Name, c.Role, c.Email, c.Phone, c.IsPrimary, c.CreatedAt)).ToList(),
-            supplier.MaterialCategories.Select(m => new MaterialCategoryResponse(
-                m.Id, m.Name, m.Description)).ToList(),
-            supplier.Capabilities.Select(c => new CapabilityResponse(
-                c.Id, c.Name, c.Description, c.IsActive)).ToList(),
-            supplier.Certifications.Select(c => new CertificationResponse(
-                c.Id, c.DocumentType.ToString(), c.DocumentName, c.IssueDate, c.ExpirationDate,
-                c.ExternalFileRef,
-                c.ExpirationDate.HasValue && c.ExpirationDate.Value < DateOnly.FromDateTime(DateTime.UtcNow),
-                c.ExpirationDate.HasValue && c.ExpirationDate.Value <= DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
-                c.CreatedAt)).ToList(),
-            null // Performance summary computed separately
-        );
     }
 }

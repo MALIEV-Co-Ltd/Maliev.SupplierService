@@ -8,8 +8,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Maliev.SupplierService.Api.Controllers;
 
+/// <summary>
+/// Controller for managing supplier performance evaluations.
+/// </summary>
 [ApiController]
-[ApiVersion("1")]
+[ApiVersion("1.0")]
 [Route("suppliers/v{version:apiVersion}/suppliers/{supplierId:guid}/evaluations")]
 [Authorize]
 public class SupplierEvaluationsController : ControllerBase
@@ -18,6 +21,12 @@ public class SupplierEvaluationsController : ControllerBase
     private readonly IValidator<CreateEvaluationRequest> _validator;
     private readonly ILogger<SupplierEvaluationsController> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SupplierEvaluationsController"/> class.
+    /// </summary>
+    /// <param name="supplierService">The supplier service.</param>
+    /// <param name="validator">The validator for evaluation creation requests.</param>
+    /// <param name="logger">The logger.</param>
     public SupplierEvaluationsController(
         ISupplierService supplierService,
         IValidator<CreateEvaluationRequest> validator,

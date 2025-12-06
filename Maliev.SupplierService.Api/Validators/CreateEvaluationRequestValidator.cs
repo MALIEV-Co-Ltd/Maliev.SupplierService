@@ -3,8 +3,15 @@ using Maliev.SupplierService.Api.DTOs.Requests;
 
 namespace Maliev.SupplierService.Api.Validators;
 
+/// <summary>
+/// Validator for <see cref="CreateEvaluationRequest"/> objects.
+/// </summary>
 public class CreateEvaluationRequestValidator : AbstractValidator<CreateEvaluationRequest>
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CreateEvaluationRequestValidator"/> class.
+    /// Defines validation rules for properties of <see cref="CreateEvaluationRequest"/>.
+    /// </summary>
     public CreateEvaluationRequestValidator()
     {
         RuleFor(x => x.Category)
