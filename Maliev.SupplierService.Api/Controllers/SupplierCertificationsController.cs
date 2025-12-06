@@ -8,8 +8,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Maliev.SupplierService.Api.Controllers;
 
+/// <summary>
+/// Controller for managing supplier certifications.
+/// </summary>
 [ApiController]
-[ApiVersion("1")]
+[ApiVersion("1.0")]
 [Route("suppliers/v{version:apiVersion}/suppliers/{supplierId:guid}/certifications")]
 [Authorize]
 public class SupplierCertificationsController : ControllerBase
@@ -18,6 +21,12 @@ public class SupplierCertificationsController : ControllerBase
     private readonly IValidator<CreateCertificationRequest> _validator;
     private readonly ILogger<SupplierCertificationsController> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SupplierCertificationsController"/> class.
+    /// </summary>
+    /// <param name="supplierService">The supplier service.</param>
+    /// <param name="validator">The validator for certification creation requests.</param>
+    /// <param name="logger">The logger.</param>
     public SupplierCertificationsController(
         ISupplierService supplierService,
         IValidator<CreateCertificationRequest> validator,
@@ -118,14 +127,21 @@ public class SupplierCertificationsController : ControllerBase
     }
 }
 
+/// <summary>
+/// Controller for handling certifications across all suppliers.
+/// </summary>
 [ApiController]
-[ApiVersion("1")]
+[ApiVersion("1.0")]
 [Route("suppliers/v{version:apiVersion}/certifications")]
 [Authorize]
 public class CertificationsController : ControllerBase
 {
     private readonly ISupplierService _supplierService;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CertificationsController"/> class.
+    /// </summary>
+    /// <param name="supplierService">The supplier service.</param>
     public CertificationsController(ISupplierService supplierService)
     {
         _supplierService = supplierService;

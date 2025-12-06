@@ -1,32 +1,64 @@
 using Maliev.SupplierService.Api.Extensions;
-using Prometheus;
-using Scalar.AspNetCore;
-using Serilog;
+using Microsoft.EntityFrameworkCore;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure Serilog
-Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration)
-    .Enrich.FromLogContext()
-    .WriteTo.Console()
-    .CreateLogger();
+// --- Secrets & Configuration ---
+builder.AddGoogleSecretManagerVolume(); // Load secrets from /mnt/secrets if available
 
-builder.Host.UseSerilog();
+// --- Infrastructure & Observability ---
+builder.AddServiceDefaults(); // OpenTelemetry, health checks, resilience
+builder.AddServiceMeters("suppliers"); // Register service meters for OpenTelemetry business metrics
 
-// Add Aspire ServiceDefaults
-builder.AddServiceDefaults();
+builder.AddPostgresDbContext<Maliev.SupplierService.Data.SupplierDbContext>(connectionStringName: "SupplierDbContext"); // PostgreSQL with retry logic
+builder.AddRedisDistributedCache(instanceName: "Supplier:"); // Redis with in-memory fallback
+builder.AddMassTransitWithRabbitMq(); // RabbitMQ message bus (non-blocking startup)
+
+// Add DbContextFactory for AuditService (skip in Testing environment - tests manually register)
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    var connectionString = builder.Configuration.GetConnectionString("SupplierDbContext")
+        ?? throw new InvalidOperationException("Database connection string not found. Expected 'ConnectionStrings:SupplierDbContext'");
+
+    builder.Services.AddDbContextFactory<Maliev.SupplierService.Data.SupplierDbContext>(options =>
+    {
+        options.UseNpgsql(connectionString, npgsqlOptions =>
+        {
+            npgsqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(10),
+                errorCodesToAdd: null);
+        });
+    }, Microsoft.Extensions.DependencyInjection.ServiceLifetime.Scoped);
+}
+
+// --- API Configuration ---
+builder.AddDefaultCors(); // CORS from CORS:AllowedOrigins config
+builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
+
+// JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
+builder.AddJwtAuthentication();
+
+// Add OpenAPI (must be in Program.cs for XML comments to work via source generator)
+if (!builder.Environment.IsProduction())
+{
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddOpenApi("v1", options =>
+    {
+        options.AddDocumentTransformer((document, context, cancellationToken) =>
+        {
+            document.Info.Title = "Supplier Service API";
+            document.Info.Version = "v1";
+            document.Info.Description = "Supplier relationship management service. Manages supplier registration and onboarding, contact information, certification tracking with expiry alerts, performance evaluations, eligibility checks for purchase orders, and status management (active/inactive/suspended).";
+            return Task.CompletedTask;
+        });
+    });
+}
 
 // Add services
 builder.Services.AddSupplierServices(builder.Configuration);
-builder.Services.AddJwtAuthentication(builder.Configuration);
-builder.Services.AddRedisCache(builder.Configuration);
-builder.Services.AddMassTransitWithRabbitMq(builder.Configuration);
-builder.Services.AddApiVersioningConfiguration();
 builder.Services.AddExternalServiceClients(builder.Configuration);
-
-// Add OpenAPI
-builder.Services.AddOpenApi();
 
 // Add controllers
 builder.Services.AddControllers();
@@ -34,10 +66,10 @@ builder.Services.AddControllers();
 // Add rate limiting
 builder.Services.AddRateLimiter(options =>
 {
-    options.GlobalLimiter = System.Threading.RateLimiting.PartitionedRateLimiter.Create<HttpContext, string>(
-        context => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(
+        context => RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: context.User?.Identity?.Name ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
-            factory: _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+            factory: _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 100,
                 Window = TimeSpan.FromMinutes(1),
@@ -45,57 +77,31 @@ builder.Services.AddRateLimiter(options =>
             }));
 });
 
-// Add CORS
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-    {
-        var allowedOrigins = builder.Configuration.GetSection("CORS:AllowedOrigins").Get<string[]>() ?? [];
-        if (allowedOrigins.Length > 0)
-        {
-            policy.WithOrigins(allowedOrigins)
-                .AllowAnyMethod()
-                .AllowAnyHeader();
-        }
-    });
-});
-
 var app = builder.Build();
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+
+// Run database migrations on startup (skip in Testing environment)
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    try
+    {
+        await app.MigrateDatabaseAsync<Maliev.SupplierService.Data.SupplierDbContext>();
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Database migration failed - application may not function correctly");
+        // Don't throw - allow app to start for debugging
+    }
+}
 
 // Use custom middleware
 app.UseSupplierServiceMiddleware();
 
-// Use Serilog request logging
-app.UseSerilogRequestLogging();
-
-// Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
-{
-    // Map OpenAPI at /suppliers/openapi/v1.json
-    app.MapOpenApi("/suppliers/openapi/{documentName}.json");
-
-    // Map Scalar at /suppliers/scalar/v1 path (matches ingress /suppliers prefix)
-    app.MapScalarApiReference("/suppliers/scalar/v1", options =>
-    {
-        options
-            .WithTitle("MALIEV Supplier Service API")
-            .WithTheme(ScalarTheme.Default)
-            .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient)
-            .WithOpenApiRoutePattern("/suppliers/openapi/v1.json");
-    });
-
-    // Redirect root to Scalar
-    app.MapGet("/", () => Results.Redirect("/suppliers/scalar/v1")).ExcludeFromDescription();
-    app.MapGet("/suppliers", () => Results.Redirect("/suppliers/scalar/v1")).ExcludeFromDescription();
-}
-
-// Use CORS
+// Middleware Pipeline
+app.UseHttpsRedirection();
 app.UseCors();
-
-// Use rate limiting
 app.UseRateLimiter();
 
-// Use authentication and authorization
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -103,32 +109,15 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Map Aspire health endpoints
-app.MapDefaultEndpoints();
+app.MapDefaultEndpoints(servicePrefix: "suppliers");
 
-// Map Prometheus metrics
-app.MapMetrics("/suppliers/metrics");
+// Map OpenAPI and Scalar documentation (dev/staging only)
+app.MapApiDocumentation(servicePrefix: "suppliers");
 
-// Map health check endpoints
-app.MapHealthChecks("/suppliers/liveness", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
-{
-    Predicate = _ => false // No checks for liveness
-});
+logger.LogInformation("SupplierService started successfully");
+await app.RunAsync();
 
-app.MapHealthChecks("/suppliers/readiness", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
-{
-    Predicate = check => check.Tags.Contains("ready")
-});
-
-try
-{
-    Log.Information("Starting Supplier Service API");
-    app.Run();
-}
-catch (Exception ex)
-{
-    Log.Fatal(ex, "Application terminated unexpectedly");
-}
-finally
-{
-    Log.CloseAndFlush();
-}
+/// <summary>
+/// Main program class for the Supplier Service API.
+/// </summary>
+public partial class Program { }

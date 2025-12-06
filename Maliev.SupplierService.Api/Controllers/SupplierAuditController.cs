@@ -6,14 +6,21 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Maliev.SupplierService.Api.Controllers;
 
+/// <summary>
+/// Controller for retrieving supplier audit trail information.
+/// </summary>
 [ApiController]
-[ApiVersion("1")]
+[ApiVersion("1.0")]
 [Route("suppliers/v{version:apiVersion}/suppliers/{supplierId:guid}/audit")]
 [Authorize]
 public class SupplierAuditController : ControllerBase
 {
     private readonly ISupplierService _supplierService;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SupplierAuditController"/> class.
+    /// </summary>
+    /// <param name="supplierService">The supplier service.</param>
     public SupplierAuditController(ISupplierService supplierService)
     {
         _supplierService = supplierService;

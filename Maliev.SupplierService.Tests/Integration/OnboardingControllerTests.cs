@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using FluentAssertions;
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
 using Maliev.SupplierService.Data.Enums;
@@ -31,10 +30,10 @@ public class OnboardingControllerTests : BaseIntegrationTest
             $"/suppliers/v1/suppliers/{supplier.Id}/onboarding", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var result = await GetResponseAsync<SupplierResponse>(response);
-        result!.OnboardingStage.Should().Be(OnboardingStage.DocumentationReview);
+        Assert.Equal(OnboardingStage.DocumentationReview, result!.OnboardingStage);
     }
 
     [Fact]
@@ -54,7 +53,7 @@ public class OnboardingControllerTests : BaseIntegrationTest
             $"/suppliers/v1/suppliers/{supplier.Id}/onboarding", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -78,11 +77,11 @@ public class OnboardingControllerTests : BaseIntegrationTest
             new AdvanceOnboardingRequest(OnboardingStage.Active, "Approved!"));
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var result = await GetResponseAsync<SupplierResponse>(response);
-        result!.OnboardingStage.Should().Be(OnboardingStage.Active);
-        result.Status.Should().Be(SupplierStatus.Active);
+        Assert.Equal(OnboardingStage.Active, result!.OnboardingStage);
+        Assert.Equal(SupplierStatus.Active, result.Status);
     }
 
     [Fact]
@@ -105,12 +104,12 @@ public class OnboardingControllerTests : BaseIntegrationTest
             $"/suppliers/v1/suppliers/{supplier.Id}/onboarding");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var result = await GetResponseAsync<OnboardingHistoryResponse>(response);
-        result.Should().NotBeNull();
-        result!.CurrentStage.Should().Be(OnboardingStage.FinalApproval);
-        result.History.Should().HaveCountGreaterThanOrEqualTo(2);
+        Assert.NotNull(result);
+        Assert.Equal(OnboardingStage.FinalApproval, result!.CurrentStage);
+        Assert.True(result.History.Count >= 2);
     }
 
     [Fact]
@@ -127,6 +126,6 @@ public class OnboardingControllerTests : BaseIntegrationTest
             $"/suppliers/v1/suppliers/{Guid.NewGuid()}/onboarding", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 }

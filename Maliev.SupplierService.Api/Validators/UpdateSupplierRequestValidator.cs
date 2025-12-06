@@ -3,8 +3,15 @@ using Maliev.SupplierService.Api.DTOs.Requests;
 
 namespace Maliev.SupplierService.Api.Validators;
 
+/// <summary>
+/// Validator for <see cref="UpdateSupplierRequest"/> objects.
+/// </summary>
 public class UpdateSupplierRequestValidator : AbstractValidator<UpdateSupplierRequest>
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="UpdateSupplierRequestValidator"/> class.
+    /// Defines validation rules for properties of <see cref="UpdateSupplierRequest"/>.
+    /// </summary>
     public UpdateSupplierRequestValidator()
     {
         RuleFor(x => x.RowVersion)

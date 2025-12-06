@@ -3,8 +3,15 @@ using Maliev.SupplierService.Api.DTOs.Requests;
 
 namespace Maliev.SupplierService.Api.Validators;
 
+/// <summary>
+/// Validator for <see cref="CreateContactRequest"/> objects.
+/// </summary>
 public class CreateContactRequestValidator : AbstractValidator<CreateContactRequest>
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CreateContactRequestValidator"/> class.
+    /// Defines validation rules for properties of <see cref="CreateContactRequest"/>.
+    /// </summary>
     public CreateContactRequestValidator()
     {
         RuleFor(x => x.Name)

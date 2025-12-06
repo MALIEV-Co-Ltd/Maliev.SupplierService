@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using FluentAssertions;
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
 using Maliev.SupplierService.Data.Enums;
@@ -33,12 +32,12 @@ public class EvaluationsControllerTests : BaseIntegrationTest
             $"/suppliers/v1/suppliers/{supplier.Id}/evaluations", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
         var result = await GetResponseAsync<EvaluationResponse>(response);
-        result.Should().NotBeNull();
-        result!.Score.Should().Be(4);
-        result.Category.Should().Be(PerformanceRatingCategory.Quality);
+        Assert.NotNull(result);
+        Assert.Equal(4, result!.Score);
+        Assert.Equal(PerformanceRatingCategory.Quality, result.Category);
     }
 
     [Fact]
@@ -59,7 +58,7 @@ public class EvaluationsControllerTests : BaseIntegrationTest
             $"/suppliers/v1/suppliers/{supplier.Id}/evaluations", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -80,7 +79,7 @@ public class EvaluationsControllerTests : BaseIntegrationTest
             $"/suppliers/v1/suppliers/{supplier.Id}/evaluations", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -107,13 +106,13 @@ public class EvaluationsControllerTests : BaseIntegrationTest
             $"/suppliers/v1/suppliers/{supplier.Id}/evaluations");
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var result = await GetResponseAsync<EvaluationListResponse>(response);
-        result.Should().NotBeNull();
-        result!.Items.Should().HaveCount(3);
-        result.TotalCount.Should().Be(3);
-        result.AverageScore.Should().Be(4m); // (5 + 3 + 4) / 3 = 4
+        Assert.NotNull(result);
+        Assert.Equal(3, result!.Items.Count);
+        Assert.Equal(3, result.TotalCount);
+        Assert.Equal(4m, result.AverageScore); // (5 + 3 + 4) / 3 = 4
     }
 
     [Fact]
@@ -132,7 +131,7 @@ public class EvaluationsControllerTests : BaseIntegrationTest
             $"/suppliers/v1/suppliers/{Guid.NewGuid()}/evaluations", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Theory]
@@ -158,6 +157,6 @@ public class EvaluationsControllerTests : BaseIntegrationTest
             $"/suppliers/v1/suppliers/{supplier.Id}/evaluations", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 }

@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -19,6 +20,10 @@ public abstract class BaseIntegrationTest : IClassFixture<IntegrationTestWebAppF
     {
         Factory = factory;
         Client = factory.CreateClient();
+
+        // Set JWT authorization header
+        var token = factory.CreateTestJwtToken();
+        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         JsonOptions = new JsonSerializerOptions
         {

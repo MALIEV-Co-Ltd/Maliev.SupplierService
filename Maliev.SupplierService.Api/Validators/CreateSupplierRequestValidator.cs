@@ -3,8 +3,15 @@ using Maliev.SupplierService.Api.DTOs.Requests;
 
 namespace Maliev.SupplierService.Api.Validators;
 
+/// <summary>
+/// Validator for <see cref="CreateSupplierRequest"/> objects.
+/// </summary>
 public class CreateSupplierRequestValidator : AbstractValidator<CreateSupplierRequest>
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CreateSupplierRequestValidator"/> class.
+    /// Defines validation rules for properties of <see cref="CreateSupplierRequest"/>.
+    /// </summary>
     public CreateSupplierRequestValidator()
     {
         RuleFor(x => x.CompanyName)

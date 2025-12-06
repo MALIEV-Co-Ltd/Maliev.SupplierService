@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Maliev.SupplierService.Data.Migrations
 {
     [DbContext(typeof(SupplierDbContext))]
-    [Migration("20251122001258_InitialCreate")]
+    [Migration("20251203132324_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -20,7 +20,7 @@ namespace Maliev.SupplierService.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.1")
+                .HasAnnotation("ProductVersion", "10.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -235,6 +235,10 @@ namespace Maliev.SupplierService.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("tax_id");
+
+                    b.Property<decimal?>("TotalOrderValue")
+                        .HasColumnType("numeric")
+                        .HasColumnName("total_order_value");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
