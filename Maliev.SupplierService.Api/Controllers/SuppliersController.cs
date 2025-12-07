@@ -1,5 +1,5 @@
 using Asp.Versioning;
-using FluentValidation;
+
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
 using Maliev.SupplierService.Api.Mapping;
@@ -20,22 +20,18 @@ namespace Maliev.SupplierService.Api.Controllers;
 public class SuppliersController : ControllerBase
 {
     private readonly ISupplierService _supplierService;
-    private readonly IValidator<CreateSupplierRequest> _createValidator;
     private readonly ILogger<SuppliersController> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SuppliersController"/> class.
     /// </summary>
     /// <param name="supplierService">The supplier service.</param>
-    /// <param name="createValidator">The validator for supplier creation requests.</param>
     /// <param name="logger">The logger.</param>
     public SuppliersController(
         ISupplierService supplierService,
-        IValidator<CreateSupplierRequest> createValidator,
         ILogger<SuppliersController> logger)
     {
         _supplierService = supplierService;
-        _createValidator = createValidator;
         _logger = logger;
     }
 
@@ -50,12 +46,6 @@ public class SuppliersController : ControllerBase
         [FromBody] CreateSupplierRequest request,
         CancellationToken cancellationToken)
     {
-        var validationResult = await _createValidator.ValidateAsync(request, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            throw new ValidationException(validationResult.Errors);
-        }
-
         var userId = User.FindFirst("sub")?.Value ?? "anonymous";
         var userName = User.FindFirst("name")?.Value ?? "Anonymous User";
 

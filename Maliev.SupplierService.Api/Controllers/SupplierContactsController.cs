@@ -1,5 +1,4 @@
 using Asp.Versioning;
-using FluentValidation;
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
 using Maliev.SupplierService.Api.Services;
@@ -18,28 +17,28 @@ namespace Maliev.SupplierService.Api.Controllers;
 public class SupplierContactsController : ControllerBase
 {
     private readonly ISupplierService _supplierService;
-    private readonly IValidator<CreateContactRequest> _createValidator;
     private readonly ILogger<SupplierContactsController> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SupplierContactsController"/> class.
     /// </summary>
     /// <param name="supplierService">The supplier service.</param>
-    /// <param name="createValidator">The validator for contact creation requests.</param>
     /// <param name="logger">The logger.</param>
     public SupplierContactsController(
         ISupplierService supplierService,
-        IValidator<CreateContactRequest> createValidator,
         ILogger<SupplierContactsController> logger)
     {
         _supplierService = supplierService;
-        _createValidator = createValidator;
         _logger = logger;
     }
 
     /// <summary>
     /// Add contact to supplier
     /// </summary>
+    /// <param name="supplierId">The ID of the supplier to add the contact to.</param>
+    /// <param name="request">The contact details.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The created contact.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(ContactResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
@@ -49,12 +48,6 @@ public class SupplierContactsController : ControllerBase
         [FromBody] CreateContactRequest request,
         CancellationToken cancellationToken)
     {
-        var validationResult = await _createValidator.ValidateAsync(request, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            throw new ValidationException(validationResult.Errors);
-        }
-
         var userId = User.FindFirst("sub")?.Value ?? "anonymous";
         var userName = User.FindFirst("name")?.Value ?? "Anonymous User";
 
@@ -90,6 +83,9 @@ public class SupplierContactsController : ControllerBase
     /// <summary>
     /// List contacts for supplier
     /// </summary>
+    /// <param name="supplierId">The ID of the supplier.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A list of contacts for the specified supplier.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyList<ContactResponse>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<ContactResponse>>> GetContacts(

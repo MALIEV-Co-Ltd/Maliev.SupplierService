@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Maliev.SupplierService.Api.DTOs.Requests;
 
 /// <summary>
@@ -13,12 +15,12 @@ namespace Maliev.SupplierService.Api.DTOs.Requests;
 /// <param name="Capabilities">A list of the supplier's capabilities or services.</param>
 /// <param name="PrimaryContact">The primary contact person for the supplier.</param>
 public record CreateSupplierRequest(
-    string CompanyName,
-    string TaxId,
-    string Address,
-    string City,
-    string Country,
-    string? PostalCode,
+    [Required][StringLength(200)] string CompanyName,
+    [Required][StringLength(50)] string TaxId,
+    [Required][StringLength(500)] string Address,
+    [Required][StringLength(100)] string City,
+    [Required][StringLength(100)] string Country,
+    [StringLength(20)] string? PostalCode,
     IEnumerable<Guid>? MaterialCategoryIds,
     IEnumerable<string>? Capabilities,
     CreateContactRequest? PrimaryContact

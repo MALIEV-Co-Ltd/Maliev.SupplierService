@@ -1,5 +1,4 @@
 using Asp.Versioning;
-using FluentValidation;
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
 using Maliev.SupplierService.Api.Services;
@@ -18,28 +17,28 @@ namespace Maliev.SupplierService.Api.Controllers;
 public class SupplierCertificationsController : ControllerBase
 {
     private readonly ISupplierService _supplierService;
-    private readonly IValidator<CreateCertificationRequest> _validator;
     private readonly ILogger<SupplierCertificationsController> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SupplierCertificationsController"/> class.
     /// </summary>
     /// <param name="supplierService">The supplier service.</param>
-    /// <param name="validator">The validator for certification creation requests.</param>
     /// <param name="logger">The logger.</param>
     public SupplierCertificationsController(
         ISupplierService supplierService,
-        IValidator<CreateCertificationRequest> validator,
         ILogger<SupplierCertificationsController> logger)
     {
         _supplierService = supplierService;
-        _validator = validator;
         _logger = logger;
     }
 
     /// <summary>
     /// Add certification to supplier
     /// </summary>
+    /// <param name="supplierId">The ID of the supplier to add the certification to.</param>
+    /// <param name="request">The certification details.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The created certification.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(CertificationResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
@@ -49,12 +48,6 @@ public class SupplierCertificationsController : ControllerBase
         [FromBody] CreateCertificationRequest request,
         CancellationToken cancellationToken)
     {
-        var validationResult = await _validator.ValidateAsync(request, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            throw new ValidationException(validationResult.Errors);
-        }
-
         var userId = User.FindFirst("sub")?.Value ?? "anonymous";
         var userName = User.FindFirst("name")?.Value ?? "Anonymous User";
 
@@ -98,6 +91,10 @@ public class SupplierCertificationsController : ControllerBase
     /// <summary>
     /// Delete certification from supplier
     /// </summary>
+    /// <param name="supplierId">The ID of the supplier.</param>
+    /// <param name="certificationId">The ID of the certification to delete.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>An empty response if successful.</returns>
     [HttpDelete("{certificationId:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]

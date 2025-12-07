@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text.Json;
-using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.SupplierService.Api.Middleware;
@@ -46,10 +45,6 @@ public class ExceptionHandlingMiddleware
         var traceId = context.TraceIdentifier;
         var (statusCode, response) = exception switch
         {
-            ValidationException validationEx => (
-                HttpStatusCode.BadRequest,
-                CreateValidationErrorResponse(validationEx, traceId)),
-
             DbUpdateConcurrencyException concurrencyEx => (
                 HttpStatusCode.Conflict,
                 CreateErrorResponse("Conflict", $"Concurrency error: {concurrencyEx.Message}. Inner: {concurrencyEx.InnerException?.Message}", traceId)),
@@ -96,25 +91,6 @@ public class ExceptionHandlingMiddleware
             Status = GetStatusCodeFromTitle(title),
             Detail = detail,
             TraceId = traceId
-        };
-    }
-
-    private static object CreateValidationErrorResponse(ValidationException exception, string traceId)
-    {
-        var errors = exception.Errors
-            .GroupBy(e => e.PropertyName)
-            .ToDictionary(
-                g => g.Key,
-                g => g.Select(e => e.ErrorMessage).ToArray());
-
-        return new
-        {
-            Type = "https://httpstatuses.io/400",
-            Title = "Validation Error",
-            Status = 400,
-            Detail = "One or more validation errors occurred.",
-            TraceId = traceId,
-            Errors = errors
         };
     }
 

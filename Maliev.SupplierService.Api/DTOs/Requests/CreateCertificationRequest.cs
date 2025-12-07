@@ -1,6 +1,7 @@
-namespace Maliev.SupplierService.Api.DTOs.Requests;
-
+using System.ComponentModel.DataAnnotations;
 using Maliev.SupplierService.Data.Enums;
+
+namespace Maliev.SupplierService.Api.DTOs.Requests;
 
 /// <summary>
 /// Represents a request to create a new certification for a supplier.
@@ -13,9 +14,9 @@ using Maliev.SupplierService.Data.Enums;
 /// <param name="Notes">Optional notes or comments about the certification.</param>
 public record CreateCertificationRequest(
     CertificationType DocumentType,
-    string DocumentName,
-    DateOnly IssueDate,
+    [Required][StringLength(255)] string DocumentName,
+    [Required] DateOnly IssueDate,
     DateOnly? ExpirationDate,
-    string? ExternalFileRef,
-    string? Notes
+    [StringLength(500)] string? ExternalFileRef,
+    [StringLength(2000)] string? Notes
 );
