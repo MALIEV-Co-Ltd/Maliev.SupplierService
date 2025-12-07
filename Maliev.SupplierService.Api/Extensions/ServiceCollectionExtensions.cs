@@ -1,5 +1,5 @@
 using System.Text;
-using FluentValidation;
+
 using Maliev.SupplierService.Api.Configuration;
 using Maliev.SupplierService.Api.Services;
 using Maliev.SupplierService.Api.Services.ExternalServices;
@@ -36,8 +36,7 @@ public static class ServiceCollectionExtensions
 
         // Note: Database is now configured via builder.AddPostgresDbContext<SupplierDbContext>() in Program.cs
 
-        // FluentValidation
-        services.AddValidatorsFromAssemblyContaining<Program>();
+        
 
         // Services
         services.AddScoped<ISupplierService, Services.SupplierService>();

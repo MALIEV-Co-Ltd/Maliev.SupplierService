@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Maliev.SupplierService.Api.DTOs.Requests;
 
 /// <summary>
@@ -9,9 +11,9 @@ namespace Maliev.SupplierService.Api.DTOs.Requests;
 /// <param name="Phone">The phone number of the contact person.</param>
 /// <param name="IsPrimary">Indicates if this is the primary contact for the supplier.</param>
 public record CreateContactRequest(
-    string Name,
-    string Email,
-    string? Role,
-    string? Phone,
+    [Required][StringLength(200)] string Name,
+    [Required][EmailAddress][StringLength(255)] string Email,
+    [StringLength(100)] string? Role,
+    [StringLength(50)] string? Phone,
     bool IsPrimary = false
 );

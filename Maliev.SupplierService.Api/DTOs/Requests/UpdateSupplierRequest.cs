@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Maliev.SupplierService.Api.DTOs.Requests;
 
 /// <summary>
@@ -13,12 +15,12 @@ namespace Maliev.SupplierService.Api.DTOs.Requests;
 /// <param name="Capabilities">An updated list of the supplier's capabilities or services.</param>
 /// <param name="RowVersion">The required row version for optimistic concurrency control.</param>
 public record UpdateSupplierRequest(
-    string? CompanyName,
-    string? Address,
-    string? City,
-    string? Country,
-    string? PostalCode,
+    [StringLength(200)] string? CompanyName,
+    [StringLength(500)] string? Address,
+    [StringLength(100)] string? City,
+    [StringLength(100)] string? Country,
+    [StringLength(20)] string? PostalCode,
     IEnumerable<Guid>? MaterialCategoryIds,
     IEnumerable<string>? Capabilities,
-    string RowVersion // Required for optimistic concurrency
+    [Required] string RowVersion // Required for optimistic concurrency
 );

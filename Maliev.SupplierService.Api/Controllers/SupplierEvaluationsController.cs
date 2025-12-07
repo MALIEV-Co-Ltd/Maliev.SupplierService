@@ -1,5 +1,4 @@
 using Asp.Versioning;
-using FluentValidation;
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
 using Maliev.SupplierService.Api.Services;
@@ -18,28 +17,28 @@ namespace Maliev.SupplierService.Api.Controllers;
 public class SupplierEvaluationsController : ControllerBase
 {
     private readonly ISupplierService _supplierService;
-    private readonly IValidator<CreateEvaluationRequest> _validator;
     private readonly ILogger<SupplierEvaluationsController> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SupplierEvaluationsController"/> class.
     /// </summary>
     /// <param name="supplierService">The supplier service.</param>
-    /// <param name="validator">The validator for evaluation creation requests.</param>
     /// <param name="logger">The logger.</param>
     public SupplierEvaluationsController(
         ISupplierService supplierService,
-        IValidator<CreateEvaluationRequest> validator,
         ILogger<SupplierEvaluationsController> logger)
     {
         _supplierService = supplierService;
-        _validator = validator;
         _logger = logger;
     }
 
     /// <summary>
     /// Add performance evaluation to supplier
     /// </summary>
+    /// <param name="supplierId">The ID of the supplier to add the evaluation to.</param>
+    /// <param name="request">The evaluation details.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The created evaluation.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(EvaluationResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
@@ -49,12 +48,6 @@ public class SupplierEvaluationsController : ControllerBase
         [FromBody] CreateEvaluationRequest request,
         CancellationToken cancellationToken)
     {
-        var validationResult = await _validator.ValidateAsync(request, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            throw new ValidationException(validationResult.Errors);
-        }
-
         var userId = User.FindFirst("sub")?.Value ?? "anonymous";
         var userName = User.FindFirst("name")?.Value ?? "Anonymous User";
 
@@ -94,6 +87,9 @@ public class SupplierEvaluationsController : ControllerBase
     /// <summary>
     /// Get all evaluations for supplier
     /// </summary>
+    /// <param name="supplierId">The ID of the supplier.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A list of evaluations for the specified supplier.</returns>
     [HttpGet]
     [ProducesResponseType(typeof(EvaluationListResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<EvaluationListResponse>> GetEvaluations(
