@@ -42,7 +42,7 @@ public class RequestLoggingMiddleware
             var statusCode = context.Response.StatusCode;
             var elapsedMs = stopwatch.ElapsedMilliseconds;
 
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "HTTP {Method} {Path} responded {StatusCode} in {ElapsedMs}ms",
                 requestMethod,
                 requestPath,
