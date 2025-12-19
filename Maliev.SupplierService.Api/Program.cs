@@ -9,29 +9,11 @@ builder.AddGoogleSecretManagerVolume(); // Load secrets from /mnt/secrets if ava
 
 // --- Infrastructure & Observability ---
 builder.AddServiceDefaults(); // OpenTelemetry, health checks, resilience
-builder.AddServiceMeters("suppliers"); // Register service meters for OpenTelemetry business metrics
+builder.AddServiceMeters("suppliers-meter"); // Register service meters for OpenTelemetry business metrics
 
 builder.AddPostgresDbContext<Maliev.SupplierService.Data.SupplierDbContext>(connectionStringName: "SupplierDbContext"); // PostgreSQL with retry logic
-builder.AddRedisDistributedCache(instanceName: "Supplier:"); // Redis with in-memory fallback
+builder.AddRedisDistributedCache(instanceName: "supplier:"); // Redis with in-memory fallback
 builder.AddMassTransitWithRabbitMq(); // RabbitMQ message bus (non-blocking startup)
-
-// Add DbContextFactory for AuditService (skip in Testing environment - tests manually register)
-if (!builder.Environment.IsEnvironment("Testing"))
-{
-    var connectionString = builder.Configuration.GetConnectionString("SupplierDbContext")
-        ?? throw new InvalidOperationException("Database connection string not found. Expected 'ConnectionStrings:SupplierDbContext'");
-
-    builder.Services.AddDbContextFactory<Maliev.SupplierService.Data.SupplierDbContext>(options =>
-    {
-        options.UseNpgsql(connectionString, npgsqlOptions =>
-        {
-            npgsqlOptions.EnableRetryOnFailure(
-                maxRetryCount: 5,
-                maxRetryDelay: TimeSpan.FromSeconds(10),
-                errorCodesToAdd: null);
-        });
-    }, Microsoft.Extensions.DependencyInjection.ServiceLifetime.Scoped);
-}
 
 // --- API Configuration ---
 builder.AddDefaultCors(); // CORS from CORS:AllowedOrigins config
@@ -109,10 +91,10 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Map Aspire health endpoints
-app.MapDefaultEndpoints(servicePrefix: "suppliers");
+app.MapDefaultEndpoints(servicePrefix: "supplier");
 
 // Map OpenAPI and Scalar documentation (dev/staging only)
-app.MapApiDocumentation(servicePrefix: "suppliers");
+app.MapApiDocumentation(servicePrefix: "supplier");
 
 logger.LogInformation("SupplierService started successfully");
 await app.RunAsync();

@@ -12,7 +12,7 @@ namespace Maliev.SupplierService.Api.Controllers;
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
-[Route("suppliers/v{version:apiVersion}/suppliers/{supplierId:guid}/certifications")]
+[Route("supplier/v{version:apiVersion}/suppliers/{supplierId:guid}/certifications")]
 [Authorize]
 public class SupplierCertificationsController : ControllerBase
 {
@@ -129,7 +129,7 @@ public class SupplierCertificationsController : ControllerBase
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
-[Route("suppliers/v{version:apiVersion}/certifications")]
+[Route("supplier/v{version:apiVersion}/certifications")]
 [Authorize]
 public class CertificationsController : ControllerBase
 {

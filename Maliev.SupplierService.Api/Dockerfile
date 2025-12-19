@@ -49,7 +49,7 @@ ENV ASPNETCORE_ENVIRONMENT=Production
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/suppliers/liveness || exit 1
+    CMD curl -f http://localhost:8080/supplier/liveness || exit 1
 
 # Start the application
 ENTRYPOINT ["dotnet", "Maliev.SupplierService.Api.dll"]
