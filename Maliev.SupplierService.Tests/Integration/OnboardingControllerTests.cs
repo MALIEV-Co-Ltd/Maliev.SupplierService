@@ -7,6 +7,7 @@ using Maliev.SupplierService.Tests.Integration.Infrastructure;
 
 namespace Maliev.SupplierService.Tests.Integration;
 
+[Collection(nameof(IntegrationTestCollection))]
 public class OnboardingControllerTests : BaseIntegrationTest
 {
     public OnboardingControllerTests(IntegrationTestWebAppFactory factory)
@@ -27,7 +28,7 @@ public class OnboardingControllerTests : BaseIntegrationTest
 
         // Act
         var response = await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/onboarding", request);
+            $"/supplier/v1/suppliers/{supplier.Id}/onboarding", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -50,7 +51,7 @@ public class OnboardingControllerTests : BaseIntegrationTest
 
         // Act
         var response = await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/onboarding", request);
+            $"/supplier/v1/suppliers/{supplier.Id}/onboarding", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -64,16 +65,16 @@ public class OnboardingControllerTests : BaseIntegrationTest
 
         // Progress through all stages
         await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/onboarding",
+            $"/supplier/v1/suppliers/{supplier.Id}/onboarding",
             new AdvanceOnboardingRequest(OnboardingStage.DocumentationReview, "Step 1"));
 
         await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/onboarding",
+            $"/supplier/v1/suppliers/{supplier.Id}/onboarding",
             new AdvanceOnboardingRequest(OnboardingStage.FinalApproval, "Step 2"));
 
         // Act - advance to Active
         var response = await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/onboarding",
+            $"/supplier/v1/suppliers/{supplier.Id}/onboarding",
             new AdvanceOnboardingRequest(OnboardingStage.Active, "Approved!"));
 
         // Assert
@@ -92,16 +93,16 @@ public class OnboardingControllerTests : BaseIntegrationTest
 
         // Make some transitions
         await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/onboarding",
+            $"/supplier/v1/suppliers/{supplier.Id}/onboarding",
             new AdvanceOnboardingRequest(OnboardingStage.DocumentationReview, "First transition"));
 
         await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/onboarding",
+            $"/supplier/v1/suppliers/{supplier.Id}/onboarding",
             new AdvanceOnboardingRequest(OnboardingStage.FinalApproval, "Second transition"));
 
         // Act
         var response = await Client.GetAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/onboarding");
+            $"/supplier/v1/suppliers/{supplier.Id}/onboarding");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -123,7 +124,7 @@ public class OnboardingControllerTests : BaseIntegrationTest
 
         // Act
         var response = await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{Guid.NewGuid()}/onboarding", request);
+            $"/supplier/v1/suppliers/{Guid.NewGuid()}/onboarding", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);

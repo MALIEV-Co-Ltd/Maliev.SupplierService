@@ -7,6 +7,7 @@ using Maliev.SupplierService.Tests.Integration.Infrastructure;
 
 namespace Maliev.SupplierService.Tests.Integration;
 
+[Collection(nameof(IntegrationTestCollection))]
 public class CertificationsControllerTests : BaseIntegrationTest
 {
     public CertificationsControllerTests(IntegrationTestWebAppFactory factory)
@@ -31,7 +32,7 @@ public class CertificationsControllerTests : BaseIntegrationTest
 
         // Act
         var response = await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/certifications", request);
+            $"/supplier/v1/suppliers/{supplier.Id}/certifications", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -60,7 +61,7 @@ public class CertificationsControllerTests : BaseIntegrationTest
 
         // Act
         var response = await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/certifications", request);
+            $"/supplier/v1/suppliers/{supplier.Id}/certifications", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -84,7 +85,7 @@ public class CertificationsControllerTests : BaseIntegrationTest
 
         // Act
         var response = await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{Guid.NewGuid()}/certifications", request);
+            $"/supplier/v1/suppliers/{Guid.NewGuid()}/certifications", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -106,7 +107,7 @@ public class CertificationsControllerTests : BaseIntegrationTest
             Notes: null
         );
         await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/certifications", expiringRequest);
+            $"/supplier/v1/suppliers/{supplier.Id}/certifications", expiringRequest);
 
         // Add certification expiring in 60 days (outside 30-day threshold)
         var notExpiringRequest = new CreateCertificationRequest(
@@ -118,10 +119,10 @@ public class CertificationsControllerTests : BaseIntegrationTest
             Notes: null
         );
         await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/certifications", notExpiringRequest);
+            $"/supplier/v1/suppliers/{supplier.Id}/certifications", notExpiringRequest);
 
         // Act
-        var response = await Client.GetAsync("/suppliers/v1/certifications/expiring?days=30");
+        var response = await Client.GetAsync("/supplier/v1/certifications/expiring?days=30");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -149,12 +150,12 @@ public class CertificationsControllerTests : BaseIntegrationTest
         );
 
         var createResponse = await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/certifications", createRequest);
+            $"/supplier/v1/suppliers/{supplier.Id}/certifications", createRequest);
         var certification = await GetResponseAsync<CertificationResponse>(createResponse);
 
         // Act
         var response = await Client.DeleteAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/certifications/{certification!.Id}");
+            $"/supplier/v1/suppliers/{supplier.Id}/certifications/{certification!.Id}");
 
         // Assert
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);

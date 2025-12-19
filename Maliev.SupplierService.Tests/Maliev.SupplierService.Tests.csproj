@@ -41,6 +41,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Maliev.SupplierService.Api\Maliev.SupplierService.Api.csproj" />
     <ProjectReference Include="..\Maliev.SupplierService.Data\Maliev.SupplierService.Data.csproj" />
+    <ProjectReference Include="..\..\Maliev.Aspire\Maliev.Aspire.ServiceDefaults\Maliev.Aspire.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>

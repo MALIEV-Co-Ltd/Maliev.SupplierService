@@ -7,6 +7,7 @@ using Maliev.SupplierService.Tests.Integration.Infrastructure;
 
 namespace Maliev.SupplierService.Tests.Integration;
 
+[Collection(nameof(IntegrationTestCollection))]
 public class EvaluationsControllerTests : BaseIntegrationTest
 {
     public EvaluationsControllerTests(IntegrationTestWebAppFactory factory)
@@ -29,7 +30,7 @@ public class EvaluationsControllerTests : BaseIntegrationTest
 
         // Act
         var response = await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/evaluations", request);
+            $"/supplier/v1/suppliers/{supplier.Id}/evaluations", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -55,7 +56,7 @@ public class EvaluationsControllerTests : BaseIntegrationTest
 
         // Act
         var response = await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/evaluations", request);
+            $"/supplier/v1/suppliers/{supplier.Id}/evaluations", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -76,7 +77,7 @@ public class EvaluationsControllerTests : BaseIntegrationTest
 
         // Act
         var response = await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/evaluations", request);
+            $"/supplier/v1/suppliers/{supplier.Id}/evaluations", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -90,20 +91,20 @@ public class EvaluationsControllerTests : BaseIntegrationTest
 
         // Add multiple evaluations
         await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/evaluations",
+            $"/supplier/v1/suppliers/{supplier.Id}/evaluations",
             new CreateEvaluationRequest(PerformanceRatingCategory.Quality, 5, null, DateOnly.FromDateTime(DateTime.UtcNow)));
 
         await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/evaluations",
+            $"/supplier/v1/suppliers/{supplier.Id}/evaluations",
             new CreateEvaluationRequest(PerformanceRatingCategory.Delivery, 3, null, DateOnly.FromDateTime(DateTime.UtcNow)));
 
         await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/evaluations",
+            $"/supplier/v1/suppliers/{supplier.Id}/evaluations",
             new CreateEvaluationRequest(PerformanceRatingCategory.Communication, 4, null, DateOnly.FromDateTime(DateTime.UtcNow)));
 
         // Act
         var response = await Client.GetAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/evaluations");
+            $"/supplier/v1/suppliers/{supplier.Id}/evaluations");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -128,7 +129,7 @@ public class EvaluationsControllerTests : BaseIntegrationTest
 
         // Act
         var response = await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{Guid.NewGuid()}/evaluations", request);
+            $"/supplier/v1/suppliers/{Guid.NewGuid()}/evaluations", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -154,7 +155,7 @@ public class EvaluationsControllerTests : BaseIntegrationTest
 
         // Act
         var response = await Client.PostAsJsonAsync(
-            $"/suppliers/v1/suppliers/{supplier.Id}/evaluations", request);
+            $"/supplier/v1/suppliers/{supplier.Id}/evaluations", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);

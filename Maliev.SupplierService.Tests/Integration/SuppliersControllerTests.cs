@@ -7,6 +7,7 @@ using Maliev.SupplierService.Tests.Integration.Infrastructure;
 
 namespace Maliev.SupplierService.Tests.Integration;
 
+[Collection(nameof(IntegrationTestCollection))]
 public class SuppliersControllerTests : BaseIntegrationTest
 {
     public SuppliersControllerTests(IntegrationTestWebAppFactory factory)
@@ -36,7 +37,7 @@ public class SuppliersControllerTests : BaseIntegrationTest
         );
 
         // Act
-        var response = await Client.PostAsJsonAsync("/suppliers/v1/suppliers", request);
+        var response = await Client.PostAsJsonAsync("/supplier/v1/suppliers", request);
 
         // Debug
         if (response.StatusCode != HttpStatusCode.Created)
@@ -75,7 +76,7 @@ public class SuppliersControllerTests : BaseIntegrationTest
         );
 
         // Act
-        var response = await Client.PostAsJsonAsync("/suppliers/v1/suppliers", request);
+        var response = await Client.PostAsJsonAsync("/supplier/v1/suppliers", request);
 
         // Assert - InvalidOperationException maps to BadRequest in the middleware
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -98,7 +99,7 @@ public class SuppliersControllerTests : BaseIntegrationTest
         );
 
         // Act
-        var response = await Client.PostAsJsonAsync("/suppliers/v1/suppliers", request);
+        var response = await Client.PostAsJsonAsync("/supplier/v1/suppliers", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -111,7 +112,7 @@ public class SuppliersControllerTests : BaseIntegrationTest
         var supplier = await CreateTestSupplierAsync(companyName: "Get Test Company");
 
         // Act
-        var response = await Client.GetAsync($"/suppliers/v1/suppliers/{supplier.Id}");
+        var response = await Client.GetAsync($"/supplier/v1/suppliers/{supplier.Id}");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -129,7 +130,7 @@ public class SuppliersControllerTests : BaseIntegrationTest
         var nonExistingId = Guid.NewGuid();
 
         // Act
-        var response = await Client.GetAsync($"/suppliers/v1/suppliers/{nonExistingId}");
+        var response = await Client.GetAsync($"/supplier/v1/suppliers/{nonExistingId}");
 
         // Assert
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -144,7 +145,7 @@ public class SuppliersControllerTests : BaseIntegrationTest
         await CreateTestSupplierAsync("Company C", "TAX003");
 
         // Act
-        var response = await Client.GetAsync("/suppliers/v1/suppliers?page=1&pageSize=2");
+        var response = await Client.GetAsync("/supplier/v1/suppliers?page=1&pageSize=2");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -164,7 +165,7 @@ public class SuppliersControllerTests : BaseIntegrationTest
         await CreateTestSupplierAsync("Pending Company", "TAX002", SupplierStatus.PendingApproval);
 
         // Act
-        var response = await Client.GetAsync("/suppliers/v1/suppliers?status=Active");
+        var response = await Client.GetAsync("/supplier/v1/suppliers?status=Active");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -182,13 +183,13 @@ public class SuppliersControllerTests : BaseIntegrationTest
         var supplier = await CreateTestSupplierAsync();
 
         // Act
-        var response = await Client.DeleteAsync($"/suppliers/v1/suppliers/{supplier.Id}");
+        var response = await Client.DeleteAsync($"/supplier/v1/suppliers/{supplier.Id}");
 
         // Assert
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
         // Verify deleted
-        var getResponse = await Client.GetAsync($"/suppliers/v1/suppliers/{supplier.Id}");
+        var getResponse = await Client.GetAsync($"/supplier/v1/suppliers/{supplier.Id}");
         Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
     }
 
@@ -199,7 +200,7 @@ public class SuppliersControllerTests : BaseIntegrationTest
         var supplier = await CreateTestSupplierAsync();
 
         // Get current rowVersion
-        var getResponse = await Client.GetAsync($"/suppliers/v1/suppliers/{supplier.Id}");
+        var getResponse = await Client.GetAsync($"/supplier/v1/suppliers/{supplier.Id}");
         var current = await GetResponseAsync<SupplierDetailResponse>(getResponse);
 
         var request = new UpdateSupplierRequest(
@@ -214,7 +215,7 @@ public class SuppliersControllerTests : BaseIntegrationTest
         );
 
         // Act
-        var response = await Client.PutAsJsonAsync($"/suppliers/v1/suppliers/{supplier.Id}", request);
+        var response = await Client.PutAsJsonAsync($"/supplier/v1/suppliers/{supplier.Id}", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -235,7 +236,7 @@ public class SuppliersControllerTests : BaseIntegrationTest
         );
 
         // Act
-        var response = await Client.PatchAsJsonAsync($"/suppliers/v1/suppliers/{supplier.Id}/status", request);
+        var response = await Client.PatchAsJsonAsync($"/supplier/v1/suppliers/{supplier.Id}/status", request);
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
