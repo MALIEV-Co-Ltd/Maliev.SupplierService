@@ -1,5 +1,6 @@
 using Maliev.SupplierService.Data.Entities;
 using Microsoft.EntityFrameworkCore;
+using Maliev.Aspire.ServiceDefaults.Database;
 
 namespace Maliev.SupplierService.Data;
 
@@ -26,6 +27,9 @@ public class SupplierDbContext : DbContext
 
         // Explicitly ensure no concurrency token on Supplier
         modelBuilder.Entity<Supplier>().Property(s => s.UpdatedAt).IsConcurrencyToken(false);
+
+        // Apply PostgreSQL snake_case naming convention globally
+        SnakeCaseNamingHelper.ApplySnakeCaseNaming(modelBuilder);
     }
 
     public override int SaveChanges()
@@ -84,6 +88,7 @@ public class SupplierDbContext : DbContext
                 else if (entry.Entity is OnboardingStatus onboarding)
                 {
                     onboarding.TransitionedAt = now;
+            
                 }
             }
             else if (entry.State == EntityState.Modified)

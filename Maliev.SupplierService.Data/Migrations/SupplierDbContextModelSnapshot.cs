@@ -52,7 +52,8 @@ namespace Maliev.SupplierService.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_material_categories");
 
                     b.HasIndex("IsActive")
                         .HasDatabaseName("ix_material_categories_is_active");
@@ -100,7 +101,8 @@ namespace Maliev.SupplierService.Data.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("transitioned_by_name");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_onboarding_statuses");
 
                     b.HasIndex("Stage")
                         .HasDatabaseName("ix_onboarding_statuses_stage");
@@ -158,7 +160,8 @@ namespace Maliev.SupplierService.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("supplier_id");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_performance_evaluations");
 
                     b.HasIndex("EvaluationDate")
                         .HasDatabaseName("ix_performance_evaluations_evaluation_date");
@@ -241,7 +244,8 @@ namespace Maliev.SupplierService.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_suppliers");
 
                     b.HasIndex("CompanyName")
                         .HasDatabaseName("ix_suppliers_company_name");
@@ -310,7 +314,8 @@ namespace Maliev.SupplierService.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("timestamp");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_supplier_audit_logs");
 
                     b.HasIndex("ChangedBy")
                         .HasDatabaseName("ix_supplier_audit_logs_changed_by");
@@ -361,7 +366,8 @@ namespace Maliev.SupplierService.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_supplier_capabilities");
 
                     b.HasIndex("Name")
                         .HasDatabaseName("ix_supplier_capabilities_name");
@@ -419,7 +425,8 @@ namespace Maliev.SupplierService.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_supplier_certifications");
 
                     b.HasIndex("DocumentType")
                         .HasDatabaseName("ix_supplier_certifications_document_type");
@@ -478,7 +485,8 @@ namespace Maliev.SupplierService.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_supplier_contacts");
 
                     b.HasIndex("Email")
                         .HasDatabaseName("ix_supplier_contacts_email");
@@ -492,12 +500,15 @@ namespace Maliev.SupplierService.Data.Migrations
             modelBuilder.Entity("supplier_material_categories", b =>
                 {
                     b.Property<Guid>("supplier_id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_id");
 
                     b.Property<Guid>("material_category_id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("material_category_id");
 
-                    b.HasKey("supplier_id", "material_category_id");
+                    b.HasKey("supplier_id", "material_category_id")
+                        .HasName("pk_supplier_material_categories");
 
                     b.HasIndex("material_category_id")
                         .HasDatabaseName("ix_supplier_material_categories_category_id");
@@ -511,7 +522,8 @@ namespace Maliev.SupplierService.Data.Migrations
                         .WithMany("OnboardingHistory")
                         .HasForeignKey("SupplierId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_onboarding_statuses_suppliers_supplier_id");
 
                     b.Navigation("Supplier");
                 });
@@ -522,7 +534,8 @@ namespace Maliev.SupplierService.Data.Migrations
                         .WithMany("Evaluations")
                         .HasForeignKey("SupplierId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_performance_evaluations_suppliers_supplier_id");
 
                     b.Navigation("Supplier");
                 });
@@ -533,7 +546,8 @@ namespace Maliev.SupplierService.Data.Migrations
                         .WithMany("AuditLogs")
                         .HasForeignKey("SupplierId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_supplier_audit_logs_suppliers_supplier_id");
 
                     b.Navigation("Supplier");
                 });
@@ -544,7 +558,8 @@ namespace Maliev.SupplierService.Data.Migrations
                         .WithMany("Capabilities")
                         .HasForeignKey("SupplierId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_supplier_capabilities_suppliers_supplier_id");
 
                     b.Navigation("Supplier");
                 });
@@ -555,7 +570,8 @@ namespace Maliev.SupplierService.Data.Migrations
                         .WithMany("Certifications")
                         .HasForeignKey("SupplierId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_supplier_certifications_suppliers_supplier_id");
 
                     b.Navigation("Supplier");
                 });
@@ -566,7 +582,8 @@ namespace Maliev.SupplierService.Data.Migrations
                         .WithMany("Contacts")
                         .HasForeignKey("SupplierId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_supplier_contacts_suppliers_supplier_id");
 
                     b.Navigation("Supplier");
                 });
@@ -577,13 +594,15 @@ namespace Maliev.SupplierService.Data.Migrations
                         .WithMany()
                         .HasForeignKey("material_category_id")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_supplier_material_categories_material_categories_material_c~");
 
                     b.HasOne("Maliev.SupplierService.Data.Entities.Supplier", null)
                         .WithMany()
                         .HasForeignKey("supplier_id")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_supplier_material_categories_suppliers_supplier_id");
                 });
 
             modelBuilder.Entity("Maliev.SupplierService.Data.Entities.Supplier", b =>

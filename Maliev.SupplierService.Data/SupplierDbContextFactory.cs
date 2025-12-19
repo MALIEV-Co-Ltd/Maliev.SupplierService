@@ -23,23 +23,10 @@ public class SupplierDbContextFactory : IDesignTimeDbContextFactory<SupplierDbCo
     {
         var optionsBuilder = new DbContextOptionsBuilder<SupplierDbContext>();
 
-        // Try to get connection string from environment variable first
-        // This allows flexibility during migrations: dotnet ef migrations add --connection "..."
-        var connectionString = Environment.GetEnvironmentVariable("SupplierDbContext")
-            ?? throw new InvalidOperationException("Connection string 'SupplierDbContext' not found in environment variables. Please set the 'SupplierDbContext' environment variable.");
+        // Use hardcoded connection string for design-time operations
+        var connectionString = "Host=localhost;Database=supplier_design;Username=postgres;Password=postgres";
 
-        optionsBuilder.UseNpgsql(connectionString, npgsqlOptions =>
-        {
-            npgsqlOptions.MigrationsAssembly(typeof(SupplierDbContext).Assembly.GetName().Name);
-            npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
-        });
-
-        // Enable sensitive data logging for development only
-        if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development")
-        {
-            optionsBuilder.EnableSensitiveDataLogging();
-            optionsBuilder.EnableDetailedErrors();
-        }
+        optionsBuilder.UseNpgsql(connectionString);
 
         return new SupplierDbContext(optionsBuilder.Options);
     }

@@ -24,7 +24,7 @@ namespace Maliev.SupplierService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_material_categories", x => x.id);
+                    table.PrimaryKey("pk_material_categories", x => x.id);
                 });
 
             migrationBuilder.CreateTable(
@@ -47,7 +47,7 @@ namespace Maliev.SupplierService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_suppliers", x => x.id);
+                    table.PrimaryKey("pk_suppliers", x => x.id);
                 });
 
             migrationBuilder.CreateTable(
@@ -64,9 +64,9 @@ namespace Maliev.SupplierService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_onboarding_statuses", x => x.id);
+                    table.PrimaryKey("pk_onboarding_statuses", x => x.id);
                     table.ForeignKey(
-                        name: "FK_onboarding_statuses_suppliers_supplier_id",
+                        name: "fk_onboarding_statuses_suppliers_supplier_id",
                         column: x => x.supplier_id,
                         principalTable: "suppliers",
                         principalColumn: "id",
@@ -89,10 +89,10 @@ namespace Maliev.SupplierService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_performance_evaluations", x => x.id);
+                    table.PrimaryKey("pk_performance_evaluations", x => x.id);
                     table.CheckConstraint("ck_performance_evaluations_score", "score >= 1 AND score <= 5");
                     table.ForeignKey(
-                        name: "FK_performance_evaluations_suppliers_supplier_id",
+                        name: "fk_performance_evaluations_suppliers_supplier_id",
                         column: x => x.supplier_id,
                         principalTable: "suppliers",
                         principalColumn: "id",
@@ -116,9 +116,9 @@ namespace Maliev.SupplierService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_supplier_audit_logs", x => x.id);
+                    table.PrimaryKey("pk_supplier_audit_logs", x => x.id);
                     table.ForeignKey(
-                        name: "FK_supplier_audit_logs_suppliers_supplier_id",
+                        name: "fk_supplier_audit_logs_suppliers_supplier_id",
                         column: x => x.supplier_id,
                         principalTable: "suppliers",
                         principalColumn: "id",
@@ -139,9 +139,9 @@ namespace Maliev.SupplierService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_supplier_capabilities", x => x.id);
+                    table.PrimaryKey("pk_supplier_capabilities", x => x.id);
                     table.ForeignKey(
-                        name: "FK_supplier_capabilities_suppliers_supplier_id",
+                        name: "fk_supplier_capabilities_suppliers_supplier_id",
                         column: x => x.supplier_id,
                         principalTable: "suppliers",
                         principalColumn: "id",
@@ -165,9 +165,9 @@ namespace Maliev.SupplierService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_supplier_certifications", x => x.id);
+                    table.PrimaryKey("pk_supplier_certifications", x => x.id);
                     table.ForeignKey(
-                        name: "FK_supplier_certifications_suppliers_supplier_id",
+                        name: "fk_supplier_certifications_suppliers_supplier_id",
                         column: x => x.supplier_id,
                         principalTable: "suppliers",
                         principalColumn: "id",
@@ -190,9 +190,9 @@ namespace Maliev.SupplierService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_supplier_contacts", x => x.id);
+                    table.PrimaryKey("pk_supplier_contacts", x => x.id);
                     table.ForeignKey(
-                        name: "FK_supplier_contacts_suppliers_supplier_id",
+                        name: "fk_supplier_contacts_suppliers_supplier_id",
                         column: x => x.supplier_id,
                         principalTable: "suppliers",
                         principalColumn: "id",
@@ -208,15 +208,15 @@ namespace Maliev.SupplierService.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_supplier_material_categories", x => new { x.supplier_id, x.material_category_id });
+                    table.PrimaryKey("pk_supplier_material_categories", x => new { x.supplier_id, x.material_category_id });
                     table.ForeignKey(
-                        name: "FK_supplier_material_categories_material_categories_material_c~",
+                        name: "fk_supplier_material_categories_material_categories_material_c~",
                         column: x => x.material_category_id,
                         principalTable: "material_categories",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_supplier_material_categories_suppliers_supplier_id",
+                        name: "fk_supplier_material_categories_suppliers_supplier_id",
                         column: x => x.supplier_id,
                         principalTable: "suppliers",
                         principalColumn: "id",
