@@ -1,4 +1,4 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+using System.IdentityModel.Tokens.Jwt;
 using MassTransit;
 using Microsoft.Extensions.Configuration;
 using System.Security.Claims;
@@ -127,11 +127,22 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // Set environment variables BEFORE host builder processes configuration
+        // Using builder.UseSetting is more reliable than Environment.SetEnvironmentVariable 
+        // because it injects directly into the WebHost configuration that Program.cs reads.
+        builder.UseSetting($"ConnectionStrings:{DbConnectionStringName}", _postgresContainer.GetConnectionString());
+        builder.UseSetting("ConnectionStrings:redis", _redisContainer.GetConnectionString());
+        builder.UseSetting("ConnectionStrings:rabbitmq", _rabbitmqContainer.GetConnectionString());
+        builder.UseSetting("Features:PermissionBasedAuthEnabled", "true");
+
         builder.ConfigureTestServices(services =>
         {
             // Configure JWT Bearer authentication with test RSA key
             services.PostConfigureAll<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>(options =>
             {
+                // Disable claim type mapping to keep original claim names like "sub" instead of URIs
+                options.MapInboundClaims = false;
+
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
@@ -141,7 +152,9 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
                     ValidIssuer = "test-issuer",
                     ValidAudience = "test-audience",
                     IssuerSigningKey = new RsaSecurityKey(_testRsa),
-                    ClockSkew = TimeSpan.Zero // No clock skew for tests
+                    ClockSkew = TimeSpan.Zero, // No clock skew for tests
+                    NameClaimType = JwtRegisteredClaimNames.Sub,
+                    RoleClaimType = "role"
                 };
             });
 
@@ -271,11 +284,13 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     /// </summary>
     /// <param name="userId">User ID to include in token</param>
     /// <param name="roles">Roles to include in token claims</param>
+    /// <param name="permissions">Permissions to include in token claims</param>
     /// <param name="additionalClaims">Additional claims to include</param>
     /// <returns>JWT token string</returns>
     public string CreateTestJwtToken(
         string userId = "test-user",
         string[]? roles = null,
+        string[]? permissions = null,
         Dictionary<string, string>? additionalClaims = null)
     {
         var claims = new List<Claim>
@@ -288,7 +303,15 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         {
             foreach (var role in roles)
             {
-                claims.Add(new Claim(ClaimTypes.Role, role));
+                claims.Add(new Claim("role", role));
+            }
+        }
+
+        if (permissions != null)
+        {
+            foreach (var permission in permissions)
+            {
+                claims.Add(new Claim("permissions", permission));
             }
         }
 
@@ -329,6 +352,17 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
     public HttpClient CreateAuthenticatedClient(string userId = "test-user", string[]? roles = null)
     {
         var token = CreateTestJwtToken(userId, roles);
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+        return client;
+    }
+
+    /// <summary>
+    /// Creates an HTTP client with authenticated user and specified permissions.
+    /// </summary>
+    public HttpClient CreatePermissionAuthenticatedClient(string userId = "test-user", string[]? permissions = null)
+    {
+        var token = CreateTestJwtToken(userId, null, permissions);
         var client = CreateClient();
         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
         return client;
