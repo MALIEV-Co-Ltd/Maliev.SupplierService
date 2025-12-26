@@ -88,7 +88,7 @@ public class SupplierDbContext : DbContext
                 else if (entry.Entity is OnboardingStatus onboarding)
                 {
                     onboarding.TransitionedAt = now;
-            
+
                 }
             }
             else if (entry.State == EntityState.Modified)

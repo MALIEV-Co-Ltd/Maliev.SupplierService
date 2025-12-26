@@ -35,7 +35,7 @@ public static class ServiceCollectionExtensions
 
         // Note: Database is now configured via builder.AddPostgresDbContext<SupplierDbContext>() in Program.cs
 
-        
+
 
         // Services
         services.AddScoped<ISupplierService, Services.SupplierService>();
