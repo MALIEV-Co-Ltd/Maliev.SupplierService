@@ -57,5 +57,5 @@ public class SupplierAuditLog
     public string? NewValues { get; set; } // JSON
 
     // Navigation property
-    public Supplier Supplier { get; set; } = null!;
+    [System.Text.Json.Serialization.JsonIgnore] public Supplier Supplier { get; set; } = null!;
 }

@@ -54,5 +54,5 @@ public class PerformanceEvaluation
     public DateTime CreatedAt { get; set; }
 
     // Navigation property
-    public Supplier Supplier { get; set; } = null!;
+    [System.Text.Json.Serialization.JsonIgnore] public Supplier Supplier { get; set; } = null!;
 }

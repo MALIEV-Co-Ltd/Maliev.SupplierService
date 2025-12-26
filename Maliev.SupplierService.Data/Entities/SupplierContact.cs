@@ -52,5 +52,6 @@ public class SupplierContact
     public DateTime UpdatedAt { get; set; }
 
     // Navigation property
+    [System.Text.Json.Serialization.JsonIgnore]
     public Supplier Supplier { get; set; } = null!;
 }

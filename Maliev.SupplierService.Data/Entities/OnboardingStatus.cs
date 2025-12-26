@@ -45,5 +45,6 @@ public class OnboardingStatus
     public string? Notes { get; set; }
 
     // Navigation property
+    [System.Text.Json.Serialization.JsonIgnore]
     public Supplier Supplier { get; set; } = null!;
 }
