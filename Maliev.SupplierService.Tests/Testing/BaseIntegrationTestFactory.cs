@@ -92,6 +92,16 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     public new async Task DisposeAsync()
     {
+        // Explicitly stop MassTransit bus if it was started
+        if (Services != null)
+        {
+            var busControl = Services.GetService<IBusControl>();
+            if (busControl != null)
+            {
+                await busControl.StopAsync();
+            }
+        }
+
         await _postgresContainer.DisposeAsync();
         await _redisContainer.DisposeAsync();
         await _rabbitmqContainer.DisposeAsync();
@@ -114,12 +124,15 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         // to ensure they are available during host building causing Program.cs to see them.
 
 
-        // Export RSA public key for JWT validation
         var rsaParams = _testRsa.ExportParameters(false);
         Environment.SetEnvironmentVariable("JWT_PUBLIC_KEY_MODULUS", Convert.ToBase64String(rsaParams.Modulus!));
         Environment.SetEnvironmentVariable("JWT_PUBLIC_KEY_EXPONENT", Convert.ToBase64String(rsaParams.Exponent!));
 
-        // Allow derived classes to set additional environment variables
+        // Export PEM-formatted public key for Jwt:PublicKey configuration
+        var publicKeyPem = _testRsa.ExportRSAPublicKeyPem();
+        var publicKeyBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(publicKeyPem));
+        Environment.SetEnvironmentVariable("Jwt__PublicKey", publicKeyBase64);
+
         ConfigureEnvironmentVariables();
 
         return base.CreateHost(builder);

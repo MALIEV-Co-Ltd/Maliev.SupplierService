@@ -43,5 +43,5 @@ public class SupplierCapability
     public DateTime UpdatedAt { get; set; }
 
     // Navigation property
-    public Supplier Supplier { get; set; } = null!;
+    [System.Text.Json.Serialization.JsonIgnore] public Supplier Supplier { get; set; } = null!;
 }
