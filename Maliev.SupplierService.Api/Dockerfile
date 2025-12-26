@@ -31,8 +31,8 @@ RUN dotnet publish "Maliev.SupplierService.Api.csproj" -c Release -o /app/publis
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
-# Copy published application
-COPY --from=publish /app/publish .
+# Copy published application (now owned by app)
+COPY --chown=app:app --from=publish /app/publish .
 
 # Change ownership to the built-in 'app' user
 RUN chown -R app:app /app

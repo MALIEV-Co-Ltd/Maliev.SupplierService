@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Maliev.SupplierService.Api.Constants;
 using Maliev.SupplierService.Data;
 using Maliev.SupplierService.Data.Entities;
 using Maliev.SupplierService.Data.Enums;
@@ -21,8 +22,8 @@ public abstract class BaseIntegrationTest : IClassFixture<IntegrationTestWebAppF
         Factory = factory;
         Client = factory.CreateClient();
 
-        // Set JWT authorization header
-        var token = factory.CreateTestJwtToken();
+        // Set JWT authorization header with all permissions by default
+        var token = factory.CreateTestJwtToken(permissions: Permissions.GetAll().Select(p => p.Id).ToArray());
         Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         JsonOptions = new JsonSerializerOptions

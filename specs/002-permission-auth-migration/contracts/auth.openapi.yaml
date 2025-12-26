@@ -1,0 +1,58 @@
+openapi: 3.0.3
+info:
+  title: Maliev SupplierService Authorization Contracts
+  version: 1.0.0
+  description: Partial specification showing authorization requirements for SupplierService endpoints.
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerAuth: []
+
+paths:
+  /suppliers:
+    get:
+      summary: List suppliers
+      security:
+        - bearerAuth: ["supplier.suppliers.read"]
+      responses:
+        '200':
+          description: OK
+        '403':
+          description: Forbidden - Missing supplier.suppliers.read permission
+    post:
+      summary: Create supplier
+      security:
+        - bearerAuth: ["supplier.suppliers.create"]
+      responses:
+        '201':
+          description: Created
+        '403':
+          description: Forbidden - Missing supplier.suppliers.create permission
+
+  /suppliers/{id}/approve:
+    post:
+      summary: Approve supplier
+      security:
+        - bearerAuth: ["supplier.suppliers.approve"]
+      responses:
+        '204':
+          description: No Content
+        '403':
+          description: Forbidden - Missing supplier.suppliers.approve permission
+
+  /suppliers/{id}/contacts:
+    get:
+      summary: List contacts
+      security:
+        - bearerAuth: ["supplier.contacts.read"]
+      responses:
+        '200':
+          description: OK
+        '403':
+          description: Forbidden - Missing supplier.contacts.read permission

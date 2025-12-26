@@ -2,9 +2,11 @@ using Asp.Versioning;
 
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
+using Maliev.SupplierService.Api.Constants;
 using Maliev.SupplierService.Api.Mapping;
 using Maliev.SupplierService.Api.Services;
 using Maliev.SupplierService.Data.Entities;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -39,6 +41,7 @@ public class SuppliersController : ControllerBase
     /// Register a new supplier
     /// </summary>
     [HttpPost]
+    [RequirePermission(Permissions.Suppliers.Create, PreValidateModel = true)]
     [ProducesResponseType(typeof(SupplierResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(object), StatusCodes.Status409Conflict)]
@@ -77,6 +80,7 @@ public class SuppliersController : ControllerBase
     /// List suppliers with pagination and filters
     /// </summary>
     [HttpGet]
+    [RequirePermission(Permissions.Suppliers.Read, PreValidateModel = true)]
     [ProducesResponseType(typeof(SupplierListResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<SupplierListResponse>> ListSuppliers(
         [FromQuery] int page = 1,
@@ -112,6 +116,7 @@ public class SuppliersController : ControllerBase
     /// Get supplier details by ID
     /// </summary>
     [HttpGet("{id:guid}")]
+    [RequirePermission(Permissions.Suppliers.Read, PreValidateModel = true)]
     [ProducesResponseType(typeof(SupplierDetailResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<SupplierDetailResponse>> GetSupplier(
@@ -133,6 +138,7 @@ public class SuppliersController : ControllerBase
     /// Validate supplier exists (for service-to-service integration)
     /// </summary>
     [HttpGet("{id:guid}/validate")]
+    [RequirePermission(Permissions.Suppliers.Read, PreValidateModel = true)]
     [ProducesResponseType(typeof(SupplierValidationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<SupplierValidationResponse>> ValidateSupplier(
@@ -160,6 +166,7 @@ public class SuppliersController : ControllerBase
     /// Check supplier eligibility for purchase orders
     /// </summary>
     [HttpGet("{id:guid}/eligibility")]
+    [RequirePermission(Permissions.Suppliers.Read, PreValidateModel = true)]
     [ProducesResponseType(typeof(SupplierEligibilityResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<SupplierEligibilityResponse>> CheckEligibility(
@@ -181,7 +188,8 @@ public class SuppliersController : ControllerBase
     /// <summary>
     /// List all material categories
     /// </summary>
-    [HttpGet("/suppliers/v{version:apiVersion}/categories")]
+    [HttpGet("/supplier/v{version:apiVersion}/suppliers/categories")]
+    [RequirePermission(Permissions.Suppliers.Read, PreValidateModel = true)]
     [ProducesResponseType(typeof(MaterialCategoryListResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<MaterialCategoryListResponse>> GetCategories(
         CancellationToken cancellationToken)
@@ -198,6 +206,7 @@ public class SuppliersController : ControllerBase
     /// Update supplier information
     /// </summary>
     [HttpPut("{id:guid}")]
+    [RequirePermission(Permissions.Suppliers.Update, PreValidateModel = true)]
     [ProducesResponseType(typeof(SupplierResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
@@ -210,9 +219,13 @@ public class SuppliersController : ControllerBase
         var userId = User.FindFirst("sub")?.Value ?? "anonymous";
         var userName = User.FindFirst("name")?.Value ?? "Anonymous User";
 
+        if (!long.TryParse(request.RowVersion, out var rowVersion))
+        {
+            return BadRequest(new { message = "Invalid RowVersion format." });
+        }
+
         try
         {
-            var rowVersion = long.Parse(request.RowVersion);
             var supplier = await _supplierService.UpdateAsync(
                 id,
                 request.CompanyName,
@@ -243,6 +256,7 @@ public class SuppliersController : ControllerBase
     /// Update supplier status
     /// </summary>
     [HttpPatch("{id:guid}/status")]
+    [RequirePermission(Permissions.Suppliers.Update, PreValidateModel = true)]
     [ProducesResponseType(typeof(SupplierResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<SupplierResponse>> UpdateStatus(
@@ -275,6 +289,7 @@ public class SuppliersController : ControllerBase
     /// Update supplier metadata (for external service callbacks)
     /// </summary>
     [HttpPatch("{id:guid}/metadata")]
+    [RequirePermission(Permissions.Suppliers.Update, PreValidateModel = true)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateMetadata(
@@ -302,6 +317,7 @@ public class SuppliersController : ControllerBase
     /// Delete supplier
     /// </summary>
     [HttpDelete("{id:guid}")]
+    [RequirePermission(Permissions.Suppliers.Delete, PreValidateModel = true)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteSupplier(

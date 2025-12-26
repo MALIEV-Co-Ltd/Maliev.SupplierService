@@ -122,6 +122,9 @@ npm-debug.log
 # Docker
 .docker/
 
+.claude/settings.local.json
+.gemini/settings.local.json
+
 # Terraform
 *.tfstate
 *.tfstate.*
@@ -144,3 +147,13 @@ docker-compose.dev.yml
 *SUMMARY*.md
 *AUDIT*.md
 *.Improvements.md
+
+# Test Outputs
+*test-output.txt
+*_error.txt
+
+
+# Test Outputs
+*test-output.txt
+*_error.txt
+

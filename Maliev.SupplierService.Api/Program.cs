@@ -1,5 +1,9 @@
+using Maliev.SupplierService.Api.Constants;
+using Maliev.SupplierService.Api.Services;
 using Maliev.SupplierService.Api.Extensions;
+using Maliev.Aspire.ServiceDefaults;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,9 +13,14 @@ builder.AddGoogleSecretManagerVolume(); // Load secrets from /mnt/secrets if ava
 
 // --- Infrastructure & Observability ---
 builder.AddServiceDefaults(); // OpenTelemetry, health checks, resilience
+builder.AddStandardMiddleware(options =>
+{
+    options.EnableRequestLogging = true;
+});
 builder.AddServiceMeters("suppliers-meter"); // Register service meters for OpenTelemetry business metrics
 
-builder.AddPostgresDbContext<Maliev.SupplierService.Data.SupplierDbContext>(connectionStringName: "SupplierDbContext"); // PostgreSQL with retry logic
+builder.AddPostgresDbContext<Maliev.SupplierService.Data.SupplierDbContext>(
+    connectionName: "SupplierDbContext"); // PostgreSQL with retry logic
 builder.AddRedisDistributedCache(instanceName: "supplier:"); // Redis with in-memory fallback
 builder.AddMassTransitWithRabbitMq(); // RabbitMQ message bus (non-blocking startup)
 
@@ -22,20 +31,19 @@ builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
 // JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
 builder.AddJwtAuthentication();
 
+// --- Authorization ---
+builder.Services.AddPermissionAuthorization();
+
+// IAM Client & Registration
+builder.Services.AddIAMClient(builder.Configuration, "supplier-service");
+builder.Services.AddIAMRegistration<SupplierIAMRegistrationService>();
+
 // Add OpenAPI (must be in Program.cs for XML comments to work via source generator)
 if (!builder.Environment.IsProduction())
 {
-    builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddOpenApi("v1", options =>
-    {
-        options.AddDocumentTransformer((document, context, cancellationToken) =>
-        {
-            document.Info.Title = "Supplier Service API";
-            document.Info.Version = "v1";
-            document.Info.Description = "Supplier relationship management service. Manages supplier registration and onboarding, contact information, certification tracking with expiry alerts, performance evaluations, eligibility checks for purchase orders, and status management (active/inactive/suspended).";
-            return Task.CompletedTask;
-        });
-    });
+    builder.AddStandardOpenApi(
+        title: "MALIEV Supplier Service API",
+        description: "Supplier relationship management service. Manages supplier registration and onboarding, contact information, certification tracking with expiry alerts, performance evaluations, eligibility checks for purchase orders, and status management (active/inactive/suspended).");
 }
 
 // Add services
@@ -77,7 +85,7 @@ if (!app.Environment.IsEnvironment("Testing"))
 }
 
 // Use custom middleware
-app.UseSupplierServiceMiddleware();
+app.UseStandardMiddleware();
 
 // Middleware Pipeline
 app.UseHttpsRedirection();
