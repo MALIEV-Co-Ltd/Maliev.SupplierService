@@ -798,19 +798,13 @@ public class SupplierService : ISupplierService
             userName,
             cancellationToken);
 
-                // Invalidate cache
+        // Invalidate cache
+        await _cacheService.RemoveAsync($"supplier:{supplierId}", cancellationToken);
 
-                await _cacheService.RemoveAsync($"supplier:{supplierId}", cancellationToken);
+        _logger.LogInformation("Deleted certification {CertificationId} from supplier {SupplierId}", certificationId, supplierId);
+    }
 
-        
-
-                _logger.LogInformation("Deleted certification {CertificationId} from supplier {SupplierId}", certificationId, supplierId);
-
-            }
-
-        
-
-            /// <summary>
+    /// <summary>
     /// Retrieves a read-only list of certifications that are expiring within a specified threshold asynchronously.
     /// </summary>
     /// <param name="daysThreshold">The number of days within which a certification is considered expiring soon.</param>

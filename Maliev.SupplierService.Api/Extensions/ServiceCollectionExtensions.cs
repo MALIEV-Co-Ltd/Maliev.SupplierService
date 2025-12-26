@@ -32,7 +32,6 @@ public static class ServiceCollectionExtensions
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
         services.Configure<RedisSettings>(configuration.GetSection(RedisSettings.SectionName));
         services.Configure<RabbitMQSettings>(configuration.GetSection(RabbitMQSettings.SectionName));
-        services.Configure<ExternalServicesSettings>(configuration.GetSection(ExternalServicesSettings.SectionName));
 
         // Note: Database is now configured via builder.AddPostgresDbContext<SupplierDbContext>() in Program.cs
 
@@ -205,32 +204,10 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var settings = configuration.GetSection(ExternalServicesSettings.SectionName).Get<ExternalServicesSettings>()
-            ?? new ExternalServicesSettings();
-
-        // PurchaseOrder Service Client
-        services.AddHttpClient<IPurchaseOrderServiceClient, PurchaseOrderServiceClient>(client =>
-        {
-            client.BaseAddress = new Uri(settings.PurchaseOrderService.BaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(settings.PurchaseOrderService.TimeoutInSeconds);
-        })
-        .AddStandardResilienceHandler();
-
-        // Invoice Service Client
-        services.AddHttpClient<IInvoiceServiceClient, InvoiceServiceClient>(client =>
-        {
-            client.BaseAddress = new Uri(settings.InvoiceService.BaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(settings.InvoiceService.TimeoutInSeconds);
-        })
-        .AddStandardResilienceHandler();
-
-        // Material Service Client
-        services.AddHttpClient<IMaterialServiceClient, MaterialServiceClient>(client =>
-        {
-            client.BaseAddress = new Uri(settings.MaterialService.BaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(settings.MaterialService.TimeoutInSeconds);
-        })
-        .AddStandardResilienceHandler();
+        // Use standardized helpers from ServiceDefaults
+        services.AddServiceClient<IPurchaseOrderServiceClient, PurchaseOrderServiceClient>(configuration, "PurchaseOrderService");
+        services.AddServiceClient<IInvoiceServiceClient, InvoiceServiceClient>(configuration, "InvoiceService");
+        services.AddServiceClient<IMaterialServiceClient, MaterialServiceClient>(configuration, "MaterialService");
 
         return services;
     }

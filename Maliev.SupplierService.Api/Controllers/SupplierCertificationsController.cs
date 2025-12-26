@@ -1,7 +1,9 @@
 using Asp.Versioning;
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
+using Maliev.SupplierService.Api.Constants;
 using Maliev.SupplierService.Api.Services;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -40,6 +42,7 @@ public class SupplierCertificationsController : ControllerBase
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The created certification.</returns>
     [HttpPost]
+    [RequirePermission(Permissions.Suppliers.Update, PreValidateModel = true)]
     [ProducesResponseType(typeof(CertificationResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
@@ -96,6 +99,7 @@ public class SupplierCertificationsController : ControllerBase
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>An empty response if successful.</returns>
     [HttpDelete("{certificationId:guid}")]
+    [RequirePermission(Permissions.Suppliers.Update, PreValidateModel = true)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteCertification(
@@ -148,6 +152,7 @@ public class CertificationsController : ControllerBase
     /// Get certifications expiring within threshold days
     /// </summary>
     [HttpGet("expiring")]
+    [RequirePermission(Permissions.Suppliers.Read, PreValidateModel = true)]
     [ProducesResponseType(typeof(ExpiringCertificationsListResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<ExpiringCertificationsListResponse>> GetExpiringCertifications(
         [FromQuery] int days = 30,
