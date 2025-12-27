@@ -54,7 +54,6 @@ jobs:
         run: dotnet build Maliev.SupplierService.sln --no-restore --configuration Release
 
       - name: Run tests
-        continue-on-error: true
         run: dotnet test Maliev.SupplierService.sln --no-build --configuration Release --verbosity normal
         env:
           ConnectionStrings__SupplierDbContext: "Server=localhost;Port=5432;Database=supplier_service_test_db;User Id=postgres;Password=postgres;"
