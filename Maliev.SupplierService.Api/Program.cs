@@ -5,6 +5,7 @@ using Maliev.Aspire.ServiceDefaults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using System.Threading.RateLimiting;
+using Maliev.SupplierService.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,19 +71,8 @@ builder.Services.AddRateLimiter(options =>
 var app = builder.Build();
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
-// Run database migrations on startup (skip in Testing environment)
-if (!app.Environment.IsEnvironment("Testing"))
-{
-    try
-    {
-        await app.MigrateDatabaseAsync<Maliev.SupplierService.Data.SupplierDbContext>();
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Database migration failed - application may not function correctly");
-        // Don't throw - allow app to start for debugging
-    }
-}
+// --- Database Migrations ---
+await app.MigrateDatabaseAsync<SupplierDbContext>();
 
 // Use custom middleware
 app.UseStandardMiddleware();
