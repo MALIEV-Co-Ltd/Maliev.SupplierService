@@ -39,7 +39,6 @@ public static class ServiceCollectionExtensions
 
         // Services
         services.AddScoped<ISupplierService, Services.SupplierService>();
-        services.AddScoped<ICacheService, CacheService>();
         services.AddScoped<IAuditService, AuditService>();
 
         return services;
@@ -88,86 +87,6 @@ public static class ServiceCollectionExtensions
             });
 
         services.AddAuthorization();
-
-        return services;
-    }
-
-    /// <summary>
-    /// Configures and adds Redis caching services, with a fallback to in-memory cache if Redis is disabled.
-    /// </summary>
-    /// <param name="services">The <see cref="IServiceCollection"/> to add the services to.</param>
-    /// <param name="configuration">The application's configuration.</param>
-    /// <returns>The <see cref="IServiceCollection"/> for chaining.</returns>
-    public static IServiceCollection AddRedisCache(
-        this IServiceCollection services,
-        IConfiguration configuration)
-    {
-        var redisConnectionString = configuration.GetConnectionString("redis")
-            ?? throw new InvalidOperationException("Redis connection string not found. Expected 'ConnectionStrings:redis'");
-
-        services.AddSingleton<IConnectionMultiplexer>(sp =>
-            ConnectionMultiplexer.Connect(redisConnectionString));
-
-        services.AddStackExchangeRedisCache(options =>
-        {
-            options.Configuration = redisConnectionString;
-        });
-
-        return services;
-    }
-
-    /// <summary>
-    /// Configures and adds MassTransit with RabbitMQ, with a fallback to in-memory transport for development/testing.
-    /// </summary>
-    /// <param name="services">The <see cref="IServiceCollection"/> to add the services to.</param>
-    /// <param name="configuration">The application's configuration.</param>
-    /// <returns>The <see cref="IServiceCollection"/> for chaining.</returns>
-    public static IServiceCollection AddMassTransitWithRabbitMq(
-        this IServiceCollection services,
-        IConfiguration configuration)
-    {
-        var rabbitmqConnectionString = configuration.GetConnectionString("rabbitmq");
-        var rabbitMqSettings = configuration.GetSection(RabbitMQSettings.SectionName).Get<RabbitMQSettings>()
-            ?? new RabbitMQSettings();
-
-        if (!string.IsNullOrEmpty(rabbitmqConnectionString))
-        {
-            services.AddMassTransit(config =>
-            {
-                config.UsingRabbitMq((context, cfg) =>
-                {
-                    cfg.Host(rabbitmqConnectionString);
-                    cfg.ConfigureEndpoints(context);
-                });
-            });
-        }
-        else if (rabbitMqSettings.Enabled)
-        {
-            services.AddMassTransit(config =>
-            {
-                config.UsingRabbitMq((context, cfg) =>
-                {
-                    cfg.Host(rabbitMqSettings.Host, rabbitMqSettings.VirtualHost, h =>
-                    {
-                        h.Username(rabbitMqSettings.Username);
-                        h.Password(rabbitMqSettings.Password);
-                    });
-
-                    cfg.ConfigureEndpoints(context);
-                });
-            });
-        }
-        else
-        {
-            // Use in-memory transport for standalone development
-            services.AddMassTransit(config =>
-            {
-                config.UsingInMemory((context, cfg) =>
-                {
-                    cfg.ConfigureEndpoints(context);
-                });
-            });
-        }
 
         return services;
     }
