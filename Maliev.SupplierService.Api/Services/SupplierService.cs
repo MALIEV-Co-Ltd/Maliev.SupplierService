@@ -1,10 +1,11 @@
 using Maliev.SupplierService.Api.DTOs.Requests;
-using Maliev.SupplierService.Api.Events;
 using Maliev.SupplierService.Data;
+using Maliev.MessagingContracts.Generated;
 using Maliev.SupplierService.Data.Entities;
 using Maliev.SupplierService.Data.Enums;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Maliev.Aspire.ServiceDefaults.Caching;
 
 namespace Maliev.SupplierService.Api.Services;
 
@@ -164,17 +165,33 @@ public class SupplierService : ISupplierService
             cancellationToken);
 
         // Invalidate cache
-        await _cacheService.InvalidateByTagAsync("suppliers", cancellationToken);
+        await _cacheService.RemoveAsync($"supplier:{supplier.Id}", cancellationToken);
+        await _cacheService.RemoveByPatternAsync("supplier:list:*", cancellationToken);
 
-        // Publish event
+        // Publish SupplierCreatedEvent
         await _publishEndpoint.Publish(new SupplierCreatedEvent(
-            supplier.Id,
-            supplier.CompanyName,
-            supplier.TaxId,
-            supplier.Country,
-            supplier.CreatedAt,
-            userId), cancellationToken);
+            MessageId: Guid.NewGuid(),
+            MessageName: "SupplierCreatedEvent",
+            MessageType: MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy: "SupplierService",
+            ConsumedBy: ["PurchaseOrderService", "MaterialService", "NotificationService"],
+            CorrelationId: Guid.NewGuid(),
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
+            Payload: new SupplierCreatedEventPayload(
+                SupplierId: supplier.Id,
+                CompanyName: supplier.CompanyName,
+                TaxId: supplier.TaxId,
+                Country: supplier.Country,
+                Status: supplier.Status.ToString(),
+                CreatedBy: userId,
+                CreatedAt: new DateTimeOffset(supplier.CreatedAt, TimeSpan.Zero)
+            )
+        ), cancellationToken);
 
+        _logger.LogInformation("Published SupplierCreatedEvent for supplier {SupplierId}", supplier.Id);
         _logger.LogInformation("Created supplier {SupplierId} with TaxId {TaxId}", supplier.Id, taxId);
 
         return supplier;
@@ -265,7 +282,8 @@ public class SupplierService : ISupplierService
 
         if (supplier is not null)
         {
-            await _cacheService.SetAsync(cacheKey, supplier, cancellationToken: cancellationToken);
+            // Cache the result for 15 minutes
+            await _cacheService.SetAsync(cacheKey, supplier, TimeSpan.FromMinutes(15), cancellationToken);
         }
 
         return supplier;
@@ -484,16 +502,30 @@ public class SupplierService : ISupplierService
 
         // Invalidate cache
         await _cacheService.RemoveAsync($"supplier:{id}", cancellationToken);
-        await _cacheService.InvalidateByTagAsync("suppliers", cancellationToken);
+        await _cacheService.RemoveByPatternAsync("supplier:list:*", cancellationToken);
 
-        // Publish event
+        // Publish SupplierUpdatedEvent
         await _publishEndpoint.Publish(new SupplierUpdatedEvent(
-            supplier.Id,
-            supplier.CompanyName,
-            changedFields,
-            supplier.UpdatedAt,
-            userId), cancellationToken);
+            MessageId: Guid.NewGuid(),
+            MessageName: "SupplierUpdatedEvent",
+            MessageType: MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy: "SupplierService",
+            ConsumedBy: ["PurchaseOrderService", "MaterialService", "NotificationService"],
+            CorrelationId: Guid.NewGuid(),
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
+            Payload: new SupplierUpdatedEventPayload(
+                SupplierId: supplier.Id,
+                CompanyName: supplier.CompanyName,
+                ChangedFields: changedFields.ToArray(),
+                UpdatedBy: userId,
+                UpdatedAt: new DateTimeOffset(supplier.UpdatedAt, TimeSpan.Zero)
+            )
+        ), cancellationToken);
 
+        _logger.LogInformation("Published SupplierUpdatedEvent for supplier {SupplierId}", supplier.Id);
         _logger.LogInformation("Updated supplier {SupplierId}", supplier.Id);
 
         return supplier;
@@ -546,14 +578,28 @@ public class SupplierService : ISupplierService
         // Invalidate cache
         await _cacheService.RemoveAsync($"supplier:{id}", cancellationToken);
 
-        // Publish event
+        // Publish SupplierStatusChangedEvent
         await _publishEndpoint.Publish(new SupplierStatusChangedEvent(
-            supplier.Id,
-            oldStatus,
-            newStatus,
-            DateTime.UtcNow,
-            userId), cancellationToken);
+            MessageId: Guid.NewGuid(),
+            MessageName: "SupplierStatusChangedEvent",
+            MessageType: MessageType.Event,
+            MessageVersion: "1.0.0",
+            PublishedBy: "SupplierService",
+            ConsumedBy: ["PurchaseOrderService", "MaterialService", "NotificationService"],
+            CorrelationId: Guid.NewGuid(),
+            CausationId: null,
+            OccurredAtUtc: DateTimeOffset.UtcNow,
+            IsPublic: false,
+            Payload: new SupplierStatusChangedEventPayload(
+                SupplierId: supplier.Id,
+                OldStatus: oldStatus.ToString(),
+                NewStatus: newStatus.ToString(),
+                ChangedBy: userId,
+                ChangedAt: DateTimeOffset.UtcNow
+            )
+        ), cancellationToken);
 
+        _logger.LogInformation("Published SupplierStatusChangedEvent for supplier {SupplierId}", supplier.Id);
         _logger.LogInformation("Updated supplier {SupplierId} status from {OldStatus} to {NewStatus}", supplier.Id, oldStatus, newStatus);
 
         return supplier;
@@ -1091,7 +1137,7 @@ public class SupplierService : ISupplierService
 
         // Invalidate cache
         await _cacheService.RemoveAsync($"supplier:{id}", cancellationToken);
-        await _cacheService.InvalidateByTagAsync("suppliers", cancellationToken);
+        await _cacheService.RemoveByPatternAsync("supplier:list:*", cancellationToken);
 
         _logger.LogInformation("Deleted supplier {SupplierId}", id);
     }
