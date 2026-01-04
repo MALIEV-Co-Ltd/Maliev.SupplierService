@@ -21,9 +21,6 @@
     <!-- Authentication -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.1" />
 
-    <!-- Validation -->
-    
-
     <!-- Messaging -->
     <PackageReference Include="MassTransit.RabbitMQ" Version="8.5.7" />
 
@@ -37,13 +34,12 @@
     <!-- API Versioning -->
     <PackageReference Include="Asp.Versioning.Http" Version="8.1.0" />
     <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="8.1.0" />
-
-    <!-- Aspire ServiceDefaults (from GitHub Packages) -->
-    <ProjectReference Include="..\..\Maliev.Aspire\Maliev.Aspire.ServiceDefaults\Maliev.Aspire.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Maliev.SupplierService.Data\Maliev.SupplierService.Data.csproj" />
+    <ProjectReference Include="..\..\Maliev.Aspire\Maliev.Aspire.ServiceDefaults\Maliev.Aspire.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\Maliev.MessagingContracts\generated\csharp\Maliev.MessagingContracts.csproj" />
   </ItemGroup>
 
 </Project>
