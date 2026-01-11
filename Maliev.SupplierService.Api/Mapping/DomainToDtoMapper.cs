@@ -25,7 +25,7 @@ public static class DomainToDtoMapper
             supplier.OnboardingStage,
             supplier.CreatedAt,
             supplier.UpdatedAt,
-            supplier.UpdatedAt.Ticks.ToString());
+            Convert.ToBase64String(supplier.RowVersion));
     }
 
     /// <summary>
@@ -45,7 +45,7 @@ public static class DomainToDtoMapper
             supplier.OnboardingStage,
             supplier.CreatedAt,
             supplier.UpdatedAt,
-            supplier.UpdatedAt.Ticks.ToString(),
+            Convert.ToBase64String(supplier.RowVersion),
             supplier.Contacts.Select(c => new ContactResponse(
                 c.Id, c.Name, c.Role, c.Email, c.Phone, c.IsPrimary, c.CreatedAt)).ToList(),
             supplier.MaterialCategories.Select(m => new MaterialCategoryResponse(
@@ -58,7 +58,14 @@ public static class DomainToDtoMapper
                 c.ExpirationDate.HasValue && c.ExpirationDate.Value < DateOnly.FromDateTime(DateTime.UtcNow),
                 c.ExpirationDate.HasValue && c.ExpirationDate.Value <= DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
                 c.CreatedAt)).ToList(),
-            null // Performance summary computed separately
+            supplier.Evaluations.Any() ? new PerformanceSummaryResponse(
+                (decimal)supplier.Evaluations.Average(e => e.Score),
+                (decimal?)supplier.Evaluations.Where(e => e.RatingCategory == Data.Enums.PerformanceRatingCategory.Quality).Select(e => (int?)e.Score).Average(),
+                (decimal?)supplier.Evaluations.Where(e => e.RatingCategory == Data.Enums.PerformanceRatingCategory.Delivery).Select(e => (int?)e.Score).Average(),
+                (decimal?)supplier.Evaluations.Where(e => e.RatingCategory == Data.Enums.PerformanceRatingCategory.Communication).Select(e => (int?)e.Score).Average(),
+                (decimal?)supplier.Evaluations.Where(e => e.RatingCategory == Data.Enums.PerformanceRatingCategory.Pricing).Select(e => (int?)e.Score).Average(),
+                supplier.Evaluations.Count,
+                supplier.Evaluations.Max(e => e.CreatedAt)) : null
         );
     }
 }

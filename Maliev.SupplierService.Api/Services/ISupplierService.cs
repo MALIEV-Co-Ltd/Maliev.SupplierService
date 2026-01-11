@@ -112,7 +112,7 @@ public interface ISupplierService
         string? postalCode,
         IEnumerable<Guid>? materialCategoryIds,
         IEnumerable<string>? capabilities,
-        long rowVersion,
+        byte[] rowVersion,
         string userId,
         string userName,
         CancellationToken cancellationToken = default);
@@ -123,6 +123,7 @@ public interface ISupplierService
     /// <param name="id">The unique identifier of the supplier.</param>
     /// <param name="newStatus">The new status to apply to the supplier.</param>
     /// <param name="reason">An optional reason for the status change.</param>
+    /// <param name="rowVersion">The row version for optimistic concurrency control.</param>
     /// <param name="userId">The ID of the user updating the status.</param>
     /// <param name="userName">The name of the user updating the status.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
@@ -131,6 +132,7 @@ public interface ISupplierService
         Guid id,
         SupplierStatus newStatus,
         string? reason,
+        byte[] rowVersion,
         string userId,
         string userName,
         CancellationToken cancellationToken = default);
@@ -216,13 +218,17 @@ public interface ISupplierService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Retrieves a read-only list of certifications that are expiring within a specified threshold.
+    /// Retrieves a paginated list of certifications that are expiring within a specified threshold.
     /// </summary>
     /// <param name="daysThreshold">The number of days within which a certification is considered expiring soon.</param>
+    /// <param name="page">The page number for pagination (1-based).</param>
+    /// <param name="pageSize">The number of items per page.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
-    /// <returns>A read-only list of tuples containing the <see cref="SupplierCertification"/>, its associated <see cref="Supplier"/>, and the remaining days until expiration.</returns>
-    Task<IReadOnlyList<(SupplierCertification Certification, Supplier Supplier, int DaysUntilExpiration)>> GetExpiringCertificationsAsync(
+    /// <returns>A tuple containing a read-only list of tuples (Certification, Supplier, DaysUntilExpiration) and the total count.</returns>
+    Task<(IReadOnlyList<(SupplierCertification Certification, Supplier Supplier, int DaysUntilExpiration)> Items, int TotalCount)> GetExpiringCertificationsAsync(
         int daysThreshold,
+        int page = 1,
+        int pageSize = 20,
         CancellationToken cancellationToken = default);
 
     /// <summary>
