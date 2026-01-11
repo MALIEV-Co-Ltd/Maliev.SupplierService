@@ -93,25 +93,29 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         _containersStarted = true;
     }
 
-    public new async Task DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
-        // Explicitly stop MassTransit bus if it was started
-        if (Services != null)
-        {
-            var busControl = Services.GetService<IBusControl>();
-            if (busControl != null)
-            {
-                await busControl.StopAsync();
-            }
-        }
+        // 1. Dispose the application first (shut down host/hosted services)
+        // This ensures the app is stopped while containers are still running.
+        await base.DisposeAsync();
 
+        // 2. Dispose containers
         await _postgresContainer.DisposeAsync();
         await _redisContainer.DisposeAsync();
         await _rabbitmqContainer.DisposeAsync();
+
         _testRsa.Dispose();
-        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", null); // Cleanup
-        await base.DisposeAsync();
+
+        // Cleanup environment variables
+        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", null);
+        Environment.SetEnvironmentVariable($"ConnectionStrings__{DbConnectionStringName}", null);
+        Environment.SetEnvironmentVariable("ConnectionStrings__redis", null);
+        Environment.SetEnvironmentVariable("ConnectionStrings__rabbitmq", null);
+        Environment.SetEnvironmentVariable("Jwt__PublicKey", null);
     }
+
+    // Explicit implementation of IAsyncLifetime.DisposeAsync for xUnit 2.x
+    async Task IAsyncLifetime.DisposeAsync() => await DisposeAsync();
 
 
     protected override IHost CreateHost(IHostBuilder builder)
