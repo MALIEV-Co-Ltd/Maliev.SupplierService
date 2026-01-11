@@ -42,7 +42,7 @@ public class SupplierCertificationsController : ControllerBase
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The created certification.</returns>
     [HttpPost]
-    [RequirePermission(Permissions.Suppliers.Update, PreValidateModel = true)]
+    [RequirePermission(SupplierPermissions.Suppliers.Update, PreValidateModel = true)]
     [ProducesResponseType(typeof(CertificationResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
@@ -99,7 +99,7 @@ public class SupplierCertificationsController : ControllerBase
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>An empty response if successful.</returns>
     [HttpDelete("{certificationId:guid}")]
-    [RequirePermission(Permissions.Suppliers.Update, PreValidateModel = true)]
+    [RequirePermission(SupplierPermissions.Suppliers.Update, PreValidateModel = true)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteCertification(
@@ -152,17 +152,21 @@ public class CertificationsController : ControllerBase
     /// Get certifications expiring within threshold days
     /// </summary>
     [HttpGet("expiring")]
-    [RequirePermission(Permissions.Suppliers.Read, PreValidateModel = true)]
+    [RequirePermission(SupplierPermissions.Suppliers.Read, PreValidateModel = true)]
     [ProducesResponseType(typeof(ExpiringCertificationsListResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<ExpiringCertificationsListResponse>> GetExpiringCertifications(
         [FromQuery] int days = 30,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
         days = Math.Clamp(days, 1, 365);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        page = Math.Max(1, page);
 
-        var certifications = await _supplierService.GetExpiringCertificationsAsync(days, cancellationToken);
+        var (items, totalCount) = await _supplierService.GetExpiringCertificationsAsync(days, page, pageSize, cancellationToken);
 
-        var items = certifications.Select(c => new ExpiringCertificationResponse(
+        var responseItems = items.Select(c => new ExpiringCertificationResponse(
             c.Certification.Id,
             c.Supplier.Id,
             c.Supplier.CompanyName,
@@ -171,6 +175,6 @@ public class CertificationsController : ControllerBase
             c.Certification.ExpirationDate!.Value,
             c.DaysUntilExpiration)).ToList();
 
-        return Ok(new ExpiringCertificationsListResponse(items, items.Count));
+        return Ok(new ExpiringCertificationsListResponse(responseItems, totalCount));
     }
 }

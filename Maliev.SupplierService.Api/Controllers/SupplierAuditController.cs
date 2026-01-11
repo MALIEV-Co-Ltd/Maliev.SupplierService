@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Maliev.SupplierService.Api.DTOs.Responses;
 using Maliev.SupplierService.Api.Constants;
 using Maliev.SupplierService.Api.Services;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -31,7 +32,7 @@ public class SupplierAuditController : ControllerBase
     /// Get audit trail for supplier
     /// </summary>
     [HttpGet]
-    [Authorize(Policy = Permissions.Suppliers.Read)]
+    [RequirePermission(SupplierPermissions.Suppliers.Read)]
     [ProducesResponseType(typeof(AuditLogListResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<AuditLogListResponse>> GetAuditTrail(
         Guid supplierId,

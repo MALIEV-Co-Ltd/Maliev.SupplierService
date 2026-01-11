@@ -38,7 +38,7 @@ public class SupplierOnboardingController : ControllerBase
     /// Advance supplier onboarding stage
     /// </summary>
     [HttpPost]
-    [RequirePermission(Permissions.Suppliers.Approve, PreValidateModel = true)]
+    [RequirePermission(SupplierPermissions.Suppliers.Approve, PreValidateModel = true)]
     [ProducesResponseType(typeof(SupplierResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
@@ -88,7 +88,7 @@ public class SupplierOnboardingController : ControllerBase
     /// Get onboarding history for supplier
     /// </summary>
     [HttpGet]
-    [RequirePermission(Permissions.Suppliers.Read, PreValidateModel = true)]
+    [RequirePermission(SupplierPermissions.Suppliers.Read, PreValidateModel = true)]
     [ProducesResponseType(typeof(OnboardingHistoryResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<OnboardingHistoryResponse>> GetOnboardingHistory(
         Guid supplierId,

@@ -9,38 +9,39 @@ namespace Maliev.SupplierService.Api.Services;
 /// </summary>
 public class SupplierIAMRegistrationService : IAMRegistrationService
 {
-    private const string ServiceName = "supplier";
+    private const string ServiceNameValue = "supplier";
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SupplierIAMRegistrationService"/> class.
     /// </summary>
-    /// <param name="httpClientFactory">The HTTP client factory.</param>
+    /// <param name="configuration">The application configuration.</param>
     /// <param name="logger">The logger.</param>
     public SupplierIAMRegistrationService(
-        IHttpClientFactory httpClientFactory,
+        IConfiguration configuration,
         ILogger<SupplierIAMRegistrationService> logger)
-        : base(httpClientFactory, logger, ServiceName)
+        : base(configuration, logger, ServiceNameValue)
     {
     }
 
     /// <inheritdoc/>
     protected override IEnumerable<PermissionRegistration> GetPermissions()
     {
-        return Permissions.GetAll().Select(p => new PermissionRegistration
+        return SupplierPermissions.AllWithDescriptions.Select(p => new PermissionRegistration
         {
-            PermissionId = p.Id,
-            Description = p.Description
+            PermissionId = p.Key,
+            Description = p.Value
         });
     }
 
     /// <inheritdoc/>
     protected override IEnumerable<RoleRegistration> GetPredefinedRoles()
     {
-        return Roles.GetDefinitions().Select(r => new RoleRegistration
+        return SupplierPredefinedRoles.All.Select(r => new RoleRegistration
         {
-            RoleId = r.Name,
+            RoleId = r.RoleId,
             Description = r.Description,
-            PermissionIds = r.Permissions
+            PermissionIds = r.Permissions.ToList(),
+            IsCustom = false
         });
     }
 }
