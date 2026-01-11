@@ -36,17 +36,6 @@ public class SupplierDbContext : DbContext
         modelBuilder.AddOutboxMessageEntity();
         modelBuilder.AddOutboxStateEntity();
 
-        // Configure UpdatedAt as a concurrency token for all auditable entities
-        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
-        {
-            if (typeof(IAuditableEntity).IsAssignableFrom(entityType.ClrType))
-            {
-                modelBuilder.Entity(entityType.ClrType)
-                    .Property(nameof(IAuditableEntity.UpdatedAt))
-                    .IsConcurrencyToken();
-            }
-        }
-
         // Apply PostgreSQL snake_case naming convention globally
         SnakeCaseNamingHelper.ApplySnakeCaseNaming(modelBuilder);
     }

@@ -218,14 +218,9 @@ public class SuppliersController : ControllerBase
         var userId = User.FindFirst("sub")?.Value ?? "anonymous";
         var userName = User.FindFirst("name")?.Value ?? "Anonymous User";
 
-        byte[] rowVersion;
-        try
+        if (!DecodeRowVersion(request.RowVersion, out var rowVersion, out var errorResponse))
         {
-            rowVersion = Convert.FromBase64String(request.RowVersion);
-        }
-        catch (FormatException)
-        {
-            return BadRequest(new { message = $"Invalid RowVersion format. Must be a Base64 string. Received: '{request.RowVersion}'" });
+            return errorResponse!;
         }
 
         try
@@ -278,14 +273,9 @@ public class SuppliersController : ControllerBase
         var userId = User.FindFirst("sub")?.Value ?? "anonymous";
         var userName = User.FindFirst("name")?.Value ?? "Anonymous User";
 
-        byte[] rowVersion;
-        try
+        if (!DecodeRowVersion(request.RowVersion, out var rowVersion, out var errorResponse))
         {
-            rowVersion = Convert.FromBase64String(request.RowVersion);
-        }
-        catch (FormatException)
-        {
-            return BadRequest(new { message = $"Invalid RowVersion format. Must be a Base64 string. Received: '{request.RowVersion}'" });
+            return errorResponse!;
         }
 
         try
@@ -357,6 +347,22 @@ public class SuppliersController : ControllerBase
         catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
         {
             return NotFound(new { message = ex.Message });
+        }
+    }
+
+    private bool DecodeRowVersion(string rowVersionStr, out byte[] rowVersion, out BadRequestObjectResult? errorResponse)
+    {
+        try
+        {
+            rowVersion = Convert.FromBase64String(rowVersionStr);
+            errorResponse = null;
+            return true;
+        }
+        catch (FormatException)
+        {
+            rowVersion = Array.Empty<byte>();
+            errorResponse = BadRequest(new { message = $"Invalid RowVersion format. Must be a Base64 string. Received: '{rowVersionStr}'" });
+            return false;
         }
     }
 }
