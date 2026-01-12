@@ -3,6 +3,7 @@ using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
 using Maliev.SupplierService.Api.Constants;
 using Maliev.SupplierService.Api.Services;
+using Maliev.Aspire.ServiceDefaults.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -41,7 +42,7 @@ public class SupplierContactsController : ControllerBase
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The created contact.</returns>
     [HttpPost]
-    [Authorize(Policy = Permissions.Contacts.Create)]
+    [RequirePermission(SupplierPermissions.Contacts.Create, PreValidateModel = true)]
     [ProducesResponseType(typeof(ContactResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
@@ -89,7 +90,7 @@ public class SupplierContactsController : ControllerBase
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A list of contacts for the specified supplier.</returns>
     [HttpGet]
-    [Authorize(Policy = Permissions.Contacts.Read)]
+    [RequirePermission(SupplierPermissions.Contacts.Read, PreValidateModel = true)]
     [ProducesResponseType(typeof(IReadOnlyList<ContactResponse>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<ContactResponse>>> GetContacts(
         Guid supplierId,

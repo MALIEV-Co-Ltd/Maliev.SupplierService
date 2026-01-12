@@ -1,6 +1,7 @@
 using Maliev.SupplierService.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 using Maliev.Aspire.ServiceDefaults.Database;
+using MassTransit;
 
 namespace Maliev.SupplierService.Data;
 
@@ -20,13 +21,20 @@ public class SupplierDbContext : DbContext
     public DbSet<SupplierAuditLog> SupplierAuditLogs => Set<SupplierAuditLog>();
     public DbSet<OnboardingStatus> OnboardingStatuses => Set<OnboardingStatus>();
 
+    // MassTransit Outbox Entities
+    public DbSet<MassTransit.EntityFrameworkCoreIntegration.OutboxMessage> OutboxMessages => Set<MassTransit.EntityFrameworkCoreIntegration.OutboxMessage>();
+    public DbSet<MassTransit.EntityFrameworkCoreIntegration.OutboxState> OutboxStates => Set<MassTransit.EntityFrameworkCoreIntegration.OutboxState>();
+    public DbSet<MassTransit.EntityFrameworkCoreIntegration.InboxState> InboxStates => Set<MassTransit.EntityFrameworkCoreIntegration.InboxState>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(SupplierDbContext).Assembly);
 
-        // Explicitly ensure no concurrency token on Supplier
-        modelBuilder.Entity<Supplier>().Property(s => s.UpdatedAt).IsConcurrencyToken(false);
+        // Configure MassTransit Outbox
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddOutboxStateEntity();
 
         // Apply PostgreSQL snake_case naming convention globally
         SnakeCaseNamingHelper.ApplySnakeCaseNaming(modelBuilder);
@@ -50,68 +58,35 @@ public class SupplierDbContext : DbContext
 
         foreach (var entry in ChangeTracker.Entries())
         {
-            if (entry.State == EntityState.Added)
+            if (entry.State == EntityState.Added || entry.State == EntityState.Modified)
             {
-                if (entry.Entity is Supplier supplier)
+                if (entry.Entity is IAuditableEntity auditable)
                 {
-                    supplier.CreatedAt = now;
-                    supplier.UpdatedAt = now;
-                }
-                else if (entry.Entity is SupplierContact contact)
-                {
-                    contact.CreatedAt = now;
-                    contact.UpdatedAt = now;
-                }
-                else if (entry.Entity is MaterialCategory category)
-                {
-                    category.CreatedAt = now;
-                    category.UpdatedAt = now;
-                }
-                else if (entry.Entity is SupplierCapability capability)
-                {
-                    capability.CreatedAt = now;
-                    capability.UpdatedAt = now;
-                }
-                else if (entry.Entity is SupplierCertification certification)
-                {
-                    certification.CreatedAt = now;
-                    certification.UpdatedAt = now;
-                }
-                else if (entry.Entity is PerformanceEvaluation evaluation)
-                {
-                    evaluation.CreatedAt = now;
-                }
-                else if (entry.Entity is SupplierAuditLog auditLog)
-                {
-                    auditLog.Timestamp = now;
-                }
-                else if (entry.Entity is OnboardingStatus onboarding)
-                {
-                    onboarding.TransitionedAt = now;
+                    if (entry.State == EntityState.Added)
+                    {
+                        auditable.CreatedAt = now;
+                    }
+                    auditable.UpdatedAt = now;
 
+                    if (entry.Entity is Supplier supplier)
+                    {
+                        supplier.RowVersion = Guid.NewGuid().ToByteArray();
+                    }
                 }
-            }
-            else if (entry.State == EntityState.Modified)
-            {
-                if (entry.Entity is Supplier supplier)
+                else if (entry.State == EntityState.Added)
                 {
-                    supplier.UpdatedAt = now;
-                }
-                else if (entry.Entity is SupplierContact contact)
-                {
-                    contact.UpdatedAt = now;
-                }
-                else if (entry.Entity is MaterialCategory category)
-                {
-                    category.UpdatedAt = now;
-                }
-                else if (entry.Entity is SupplierCapability capability)
-                {
-                    capability.UpdatedAt = now;
-                }
-                else if (entry.Entity is SupplierCertification certification)
-                {
-                    certification.UpdatedAt = now;
+                    if (entry.Entity is PerformanceEvaluation evaluation)
+                    {
+                        evaluation.CreatedAt = now;
+                    }
+                    else if (entry.Entity is SupplierAuditLog auditLog)
+                    {
+                        auditLog.Timestamp = now;
+                    }
+                    else if (entry.Entity is OnboardingStatus onboarding)
+                    {
+                        onboarding.TransitionedAt = now;
+                    }
                 }
             }
         }

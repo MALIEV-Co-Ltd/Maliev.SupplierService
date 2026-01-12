@@ -11,7 +11,7 @@ namespace Maliev.SupplierService.Data.Entities;
 /// Indexes are configured in SupplierContactConfiguration.
 /// </remarks>
 [Table("supplier_contacts")]
-public class SupplierContact
+public class SupplierContact : IAuditableEntity
 {
     [Key]
     [Column("id")]

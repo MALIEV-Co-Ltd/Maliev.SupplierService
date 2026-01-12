@@ -6,6 +6,7 @@ using Maliev.SupplierService.Data.Enums;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Maliev.Aspire.ServiceDefaults.Caching;
+using Maliev.SupplierService.Api.Services.ExternalServices;
 
 namespace Maliev.SupplierService.Api.Services;
 
@@ -17,6 +18,9 @@ public class SupplierService : ISupplierService
     private readonly SupplierDbContext _context;
     private readonly ICacheService _cacheService;
     private readonly IAuditService _auditService;
+    private readonly IPurchaseOrderServiceClient _poClient;
+    private readonly IInvoiceServiceClient _invoiceClient;
+    private readonly IMaterialServiceClient _materialClient;
     private readonly IPublishEndpoint _publishEndpoint;
     private readonly ILogger<SupplierService> _logger;
 
@@ -26,18 +30,27 @@ public class SupplierService : ISupplierService
     /// <param name="context">The database context for supplier data.</param>
     /// <param name="cacheService">The caching service.</param>
     /// <param name="auditService">The audit logging service.</param>
+    /// <param name="poClient">The purchase order service client.</param>
+    /// <param name="invoiceClient">The invoice service client.</param>
+    /// <param name="materialClient">The material service client.</param>
     /// <param name="publishEndpoint">The MassTransit publish endpoint for events.</param>
     /// <param name="logger">The logger instance.</param>
     public SupplierService(
         SupplierDbContext context,
         ICacheService cacheService,
         IAuditService auditService,
+        IPurchaseOrderServiceClient poClient,
+        IInvoiceServiceClient invoiceClient,
+        IMaterialServiceClient materialClient,
         IPublishEndpoint publishEndpoint,
         ILogger<SupplierService> logger)
     {
         _context = context;
         _cacheService = cacheService;
         _auditService = auditService;
+        _poClient = poClient;
+        _invoiceClient = invoiceClient;
+        _materialClient = materialClient;
         _publishEndpoint = publishEndpoint;
         _logger = logger;
     }
@@ -150,10 +163,10 @@ public class SupplierService : ISupplierService
         });
 
         _context.Suppliers.Add(supplier);
-        await _context.SaveChangesAsync(cancellationToken);
 
         // Log audit for supplier creation
-        await _auditService.LogChangeAsync(
+        _auditService.LogChange(
+            _context,
             supplier.Id,
             "CREATE",
             nameof(Supplier),
@@ -161,8 +174,9 @@ public class SupplierService : ISupplierService
             null,
             new { supplier.Id, supplier.CompanyName, supplier.TaxId },
             userId,
-            userName,
-            cancellationToken);
+            userName);
+
+        await _context.SaveChangesAsync(cancellationToken);
 
         // Invalidate cache
         await _cacheService.RemoveAsync($"supplier:{supplier.Id}", cancellationToken);
@@ -237,10 +251,10 @@ public class SupplierService : ISupplierService
         };
 
         supplier.Contacts.Add(contact);
-        await _context.SaveChangesAsync(cancellationToken);
 
         // Log audit
-        await _auditService.LogChangeAsync(
+        _auditService.LogChange(
+            _context,
             supplierId,
             "ADD_CONTACT",
             nameof(SupplierContact),
@@ -248,8 +262,9 @@ public class SupplierService : ISupplierService
             null,
             contact,
             userId,
-            userName,
-            cancellationToken);
+            userName);
+
+        await _context.SaveChangesAsync(cancellationToken);
 
         // Invalidate cache
         await _cacheService.RemoveAsync($"supplier:{supplierId}", cancellationToken);
@@ -401,7 +416,7 @@ public class SupplierService : ISupplierService
         string? postalCode,
         IEnumerable<Guid>? materialCategoryIds,
         IEnumerable<string>? capabilities,
-        long rowVersion,
+        byte[] rowVersion,
         string userId,
         string userName,
         CancellationToken cancellationToken = default)
@@ -416,16 +431,23 @@ public class SupplierService : ISupplierService
             throw new InvalidOperationException("Supplier not found.");
         }
 
-        // Check optimistic concurrency using UpdatedAt ticks
-        if (supplier.UpdatedAt.Ticks != rowVersion)
-        {
-            throw new DbUpdateConcurrencyException("The supplier has been modified by another user.");
-        }
+        // Set the original row version for EF Core to use in its WHERE clause
+        _context.Entry(supplier).Property(s => s.RowVersion).OriginalValue = rowVersion;
 
-        var oldSupplier = new { supplier.CompanyName, supplier.Address, supplier.City, supplier.Country, supplier.PostalCode };
+        var oldSupplier = new
+        {
+            supplier.CompanyName,
+            supplier.Address,
+            supplier.City,
+            supplier.Country,
+            supplier.PostalCode,
+            MaterialCategoryIds = supplier.MaterialCategories.Select(c => c.Id).ToList(),
+            Capabilities = supplier.Capabilities.Select(c => c.Name).ToList()
+        };
+
         var changedFields = new List<string>();
 
-        // Update fields if provided
+        // Update fields if provided and different
         if (companyName is not null && companyName != supplier.CompanyName)
         {
             supplier.CompanyName = companyName;
@@ -446,7 +468,8 @@ public class SupplierService : ISupplierService
             supplier.Country = country;
             changedFields.Add("Country");
         }
-        if (postalCode != supplier.PostalCode)
+        // Fix: Avoid wiping postal code if not provided
+        if (postalCode is not null && postalCode != supplier.PostalCode)
         {
             supplier.PostalCode = postalCode;
             changedFields.Add("PostalCode");
@@ -455,10 +478,17 @@ public class SupplierService : ISupplierService
         // Update material categories if provided
         if (materialCategoryIds is not null)
         {
-            supplier.MaterialCategories.Clear();
+            var categoryIdsList = materialCategoryIds.Distinct().ToList();
             var categories = await _context.MaterialCategories
-                .Where(c => materialCategoryIds.Contains(c.Id) && c.IsActive)
+                .Where(c => categoryIdsList.Contains(c.Id) && c.IsActive)
                 .ToListAsync(cancellationToken);
+
+            if (categories.Count != categoryIdsList.Count)
+            {
+                throw new InvalidOperationException("One or more material category IDs are invalid or inactive.");
+            }
+
+            supplier.MaterialCategories.Clear();
             foreach (var category in categories)
             {
                 supplier.MaterialCategories.Add(category);
@@ -466,39 +496,53 @@ public class SupplierService : ISupplierService
             changedFields.Add("MaterialCategories");
         }
 
-        // Update capabilities if provided
+        // Update capabilities if provided (Delta update to avoid ID churn)
         if (capabilities is not null)
         {
-            // Remove old capabilities
-            _context.SupplierCapabilities.RemoveRange(supplier.Capabilities);
-            supplier.Capabilities.Clear();
+            var capabilityNames = capabilities.Distinct().ToList();
+            var toRemove = supplier.Capabilities.Where(c => !capabilityNames.Contains(c.Name)).ToList();
+            var toAdd = capabilityNames.Where(name => !supplier.Capabilities.Any(c => c.Name == name)).ToList();
 
-            foreach (var capabilityName in capabilities)
+            foreach (var capability in toRemove)
+            {
+                supplier.Capabilities.Remove(capability);
+            }
+
+            foreach (var name in toAdd)
             {
                 supplier.Capabilities.Add(new SupplierCapability
                 {
                     Id = Guid.NewGuid(),
                     SupplierId = supplier.Id,
-                    Name = capabilityName,
+                    Name = name,
                     IsActive = true
                 });
             }
             changedFields.Add("Capabilities");
         }
 
-        await _context.SaveChangesAsync(cancellationToken);
-
         // Log audit
-        await _auditService.LogChangeAsync(
+        _auditService.LogChange(
+            _context,
             supplier.Id,
             "UPDATE",
             nameof(Supplier),
             supplier.Id,
             oldSupplier,
-            supplier,
+            new
+            {
+                supplier.CompanyName,
+                supplier.Address,
+                supplier.City,
+                supplier.Country,
+                supplier.PostalCode,
+                MaterialCategoryIds = supplier.MaterialCategories.Select(c => c.Id).ToList(),
+                Capabilities = supplier.Capabilities.Select(c => c.Name).ToList()
+            },
             userId,
-            userName,
-            cancellationToken);
+            userName);
+
+        await _context.SaveChangesAsync(cancellationToken);
 
         // Invalidate cache
         await _cacheService.RemoveAsync($"supplier:{id}", cancellationToken);
@@ -537,6 +581,7 @@ public class SupplierService : ISupplierService
     /// <param name="id">The unique identifier of the supplier.</param>
     /// <param name="newStatus">The new status to apply to the supplier.</param>
     /// <param name="reason">An optional reason for the status change.</param>
+    /// <param name="rowVersion">The row version for optimistic concurrency control.</param>
     /// <param name="userId">The ID of the user updating the status.</param>
     /// <param name="userName">The name of the user updating the status.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
@@ -546,6 +591,7 @@ public class SupplierService : ISupplierService
         Guid id,
         SupplierStatus newStatus,
         string? reason,
+        byte[] rowVersion,
         string userId,
         string userName,
         CancellationToken cancellationToken = default)
@@ -558,13 +604,15 @@ public class SupplierService : ISupplierService
             throw new InvalidOperationException("Supplier not found.");
         }
 
+        // Set the original row version for EF Core to use in its WHERE clause
+        _context.Entry(supplier).Property(s => s.RowVersion).OriginalValue = rowVersion;
+
         var oldStatus = supplier.Status;
         supplier.Status = newStatus;
 
-        await _context.SaveChangesAsync(cancellationToken);
-
         // Log audit
-        await _auditService.LogChangeAsync(
+        _auditService.LogChange(
+            _context,
             supplier.Id,
             "STATUS_CHANGE",
             nameof(Supplier),
@@ -572,8 +620,9 @@ public class SupplierService : ISupplierService
             new { Status = oldStatus, Reason = reason },
             new { Status = newStatus },
             userId,
-            userName,
-            cancellationToken);
+            userName);
+
+        await _context.SaveChangesAsync(cancellationToken);
 
         // Invalidate cache
         await _cacheService.RemoveAsync($"supplier:{id}", cancellationToken);
@@ -692,12 +741,11 @@ public class SupplierService : ISupplierService
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var searchLower = search.ToLower();
             query = query.Where(s =>
-                s.CompanyName.ToLower().Contains(searchLower) ||
-                s.TaxId.ToLower().Contains(searchLower) ||
-                s.City.ToLower().Contains(searchLower) ||
-                s.Country.ToLower().Contains(searchLower));
+                EF.Functions.ILike(s.CompanyName, $"%{search}%") ||
+                EF.Functions.ILike(s.TaxId, $"%{search}%") ||
+                EF.Functions.ILike(s.City, $"%{search}%") ||
+                EF.Functions.ILike(s.Country, $"%{search}%"));
         }
 
         // Get total count before pagination
@@ -782,10 +830,10 @@ public class SupplierService : ISupplierService
         };
 
         _context.SupplierCertifications.Add(certification);
-        await _context.SaveChangesAsync(cancellationToken);
 
         // Log audit
-        await _auditService.LogChangeAsync(
+        _auditService.LogChange(
+            _context,
             supplierId,
             "ADD_CERTIFICATION",
             nameof(SupplierCertification),
@@ -793,8 +841,9 @@ public class SupplierService : ISupplierService
             null,
             certification,
             userId,
-            userName,
-            cancellationToken);
+            userName);
+
+        await _context.SaveChangesAsync(cancellationToken);
 
         // Invalidate cache
         await _cacheService.RemoveAsync($"supplier:{supplierId}", cancellationToken);
@@ -830,10 +879,10 @@ public class SupplierService : ISupplierService
         }
 
         _context.SupplierCertifications.Remove(certification);
-        await _context.SaveChangesAsync(cancellationToken);
 
         // Log audit
-        await _auditService.LogChangeAsync(
+        _auditService.LogChange(
+            _context,
             supplierId,
             "DELETE_CERTIFICATION",
             nameof(SupplierCertification),
@@ -841,8 +890,9 @@ public class SupplierService : ISupplierService
             certification,
             null,
             userId,
-            userName,
-            cancellationToken);
+            userName);
+
+        await _context.SaveChangesAsync(cancellationToken);
 
         // Invalidate cache
         await _cacheService.RemoveAsync($"supplier:{supplierId}", cancellationToken);
@@ -854,27 +904,39 @@ public class SupplierService : ISupplierService
     /// Retrieves a read-only list of certifications that are expiring within a specified threshold asynchronously.
     /// </summary>
     /// <param name="daysThreshold">The number of days within which a certification is considered expiring soon.</param>
+    /// <param name="page">The page number for pagination (1-based).</param>
+    /// <param name="pageSize">The number of items per page.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
     /// <returns>A read-only list of tuples containing the <see cref="SupplierCertification"/>, its associated <see cref="Supplier"/>, and the remaining days until expiration.</returns>
-    public async Task<IReadOnlyList<(SupplierCertification Certification, Supplier Supplier, int DaysUntilExpiration)>> GetExpiringCertificationsAsync(
+    public async Task<(IReadOnlyList<(SupplierCertification Certification, Supplier Supplier, int DaysUntilExpiration)> Items, int TotalCount)> GetExpiringCertificationsAsync(
         int daysThreshold,
+        int page = 1,
+        int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var thresholdDate = today.AddDays(daysThreshold);
 
-        var certifications = await _context.SupplierCertifications
+        var query = _context.SupplierCertifications
             .Include(c => c.Supplier)
             .Where(c => c.ExpirationDate.HasValue &&
                         c.ExpirationDate.Value <= thresholdDate &&
-                        c.ExpirationDate.Value >= today)
+                        c.ExpirationDate.Value >= today);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var certifications = await query
             .OrderBy(c => c.ExpirationDate)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
 
-        return certifications
+        var items = certifications
             .Select(c => (c, c.Supplier, c.ExpirationDate!.Value.DayNumber - today.DayNumber))
             .ToList();
+
+        return (items, totalCount);
     }
 
     /// <summary>
@@ -921,10 +983,10 @@ public class SupplierService : ISupplierService
         };
 
         _context.PerformanceEvaluations.Add(evaluation);
-        await _context.SaveChangesAsync(cancellationToken);
 
         // Log audit
-        await _auditService.LogChangeAsync(
+        _auditService.LogChange(
+            _context,
             supplierId,
             "ADD_EVALUATION",
             nameof(PerformanceEvaluation),
@@ -932,8 +994,9 @@ public class SupplierService : ISupplierService
             null,
             evaluation,
             userId,
-            userName,
-            cancellationToken);
+            userName);
+
+        await _context.SaveChangesAsync(cancellationToken);
 
         // Invalidate cache
         await _cacheService.RemoveAsync($"supplier:{supplierId}", cancellationToken);
@@ -987,6 +1050,12 @@ public class SupplierService : ISupplierService
             throw new InvalidOperationException("Supplier not found.");
         }
 
+        // Restrict onboarding management to PendingApproval or active onboarding flows
+        if (supplier.Status != SupplierStatus.PendingApproval && supplier.OnboardingStage == OnboardingStage.Active)
+        {
+            throw new InvalidOperationException("Onboarding can only be managed for suppliers pending approval or in active onboarding flow.");
+        }
+
         if (!OnboardingTransitions.IsValidTransition(supplier.OnboardingStage, targetStage))
         {
             var validStages = OnboardingTransitions.GetValidNextStages(supplier.OnboardingStage);
@@ -1002,6 +1071,11 @@ public class SupplierService : ISupplierService
         {
             supplier.Status = SupplierStatus.Active;
         }
+        else if (supplier.Status == SupplierStatus.Active)
+        {
+            // Revert status if moved back from Active onboarding stage
+            supplier.Status = SupplierStatus.PendingApproval;
+        }
 
         // Record transition
         var onboardingStatus = new OnboardingStatus
@@ -1015,10 +1089,10 @@ public class SupplierService : ISupplierService
         };
 
         _context.OnboardingStatuses.Add(onboardingStatus);
-        await _context.SaveChangesAsync(cancellationToken);
 
         // Log audit
-        await _auditService.LogChangeAsync(
+        _auditService.LogChange(
+            _context,
             supplierId,
             "ONBOARDING_TRANSITION",
             nameof(Supplier),
@@ -1026,8 +1100,9 @@ public class SupplierService : ISupplierService
             new { OnboardingStage = oldStage },
             new { OnboardingStage = targetStage },
             userId,
-            userName,
-            cancellationToken);
+            userName);
+
+        await _context.SaveChangesAsync(cancellationToken);
 
         // Invalidate cache
         await _cacheService.RemoveAsync($"supplier:{supplierId}", cancellationToken);
@@ -1120,8 +1195,32 @@ public class SupplierService : ISupplierService
             throw new InvalidOperationException("Supplier not found.");
         }
 
+        // Synchronous dependency checks (FR-005)
+        var poCheck = _poClient.CheckReferencesAsync(id, cancellationToken);
+        var invoiceCheck = _invoiceClient.CheckReferencesAsync(id, cancellationToken);
+        var materialCheck = _materialClient.CheckReferencesAsync(id, cancellationToken);
+
+        await Task.WhenAll(poCheck, invoiceCheck, materialCheck);
+
+        var dependencies = new List<string>();
+        if (poCheck.Result.HasReferences) dependencies.Add("PurchaseOrderService");
+        if (invoiceCheck.Result.HasReferences) dependencies.Add("InvoiceService");
+        if (materialCheck.Result.HasReferences) dependencies.Add("MaterialService");
+
+        if (dependencies.Count > 0)
+        {
+            throw new InvalidOperationException($"Supplier cannot be deleted as it is referenced by: {string.Join(", ", dependencies)}");
+        }
+
+        // Fail-closed behavior (FR-005a)
+        if (poCheck.Result.ServiceUnavailable || invoiceCheck.Result.ServiceUnavailable || materialCheck.Result.ServiceUnavailable)
+        {
+            throw new InvalidOperationException("Supplier deletion failed safely because one or more dependent services are unavailable.");
+        }
+
         // Log audit before deletion
-        await _auditService.LogChangeAsync(
+        _auditService.LogChange(
+            _context,
             id,
             "DELETE",
             nameof(Supplier),
@@ -1129,8 +1228,7 @@ public class SupplierService : ISupplierService
             supplier,
             null,
             userId,
-            userName,
-            cancellationToken);
+            userName);
 
         _context.Suppliers.Remove(supplier);
         await _context.SaveChangesAsync(cancellationToken);

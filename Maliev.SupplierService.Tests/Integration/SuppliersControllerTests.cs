@@ -217,6 +217,13 @@ public class SuppliersControllerTests : BaseIntegrationTest
         // Act
         var response = await Client.PutAsJsonAsync($"/supplier/v1/suppliers/{supplier.Id}", request);
 
+        // Debug
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            throw new Xunit.Sdk.XunitException($"BadRequest Details: {content}");
+        }
+
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -230,13 +237,25 @@ public class SuppliersControllerTests : BaseIntegrationTest
         // Arrange
         var supplier = await CreateTestSupplierAsync(status: SupplierStatus.PendingApproval);
 
+        // Get current rowVersion
+        var getResponse = await Client.GetAsync($"/supplier/v1/suppliers/{supplier.Id}");
+        var current = await GetResponseAsync<SupplierDetailResponse>(getResponse);
+
         var request = new UpdateStatusRequest(
             Status: SupplierStatus.Active,
-            Reason: "Approved by admin"
+            Reason: "Approved by admin",
+            RowVersion: current!.RowVersion
         );
 
         // Act
         var response = await Client.PatchAsJsonAsync($"/supplier/v1/suppliers/{supplier.Id}/status", request);
+
+        // Debug
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            throw new Xunit.Sdk.XunitException($"UpdateStatus BadRequest Details: {content}");
+        }
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

@@ -1,11 +1,10 @@
-using Maliev.SupplierService.Api.Constants;
-using Maliev.SupplierService.Api.Services;
-using Maliev.SupplierService.Api.Extensions;
 using Maliev.Aspire.ServiceDefaults;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authorization;
-using System.Threading.RateLimiting;
+using Maliev.SupplierService.Api.Extensions;
+using Maliev.SupplierService.Api.Services;
 using Maliev.SupplierService.Data;
+using MassTransit;
+using Microsoft.EntityFrameworkCore;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,9 +20,23 @@ builder.AddStandardMiddleware(options =>
 builder.AddServiceMeters("suppliers-meter"); // Register service meters for OpenTelemetry business metrics
 
 builder.AddPostgresDbContext<Maliev.SupplierService.Data.SupplierDbContext>(
+    configureOptions: options =>
+    {
+        if (builder.Environment.IsEnvironment("Testing"))
+        {
+            options.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+        }
+    },
     connectionName: "SupplierDbContext"); // PostgreSQL with retry logic
 builder.AddRedisDistributedCache(instanceName: "supplier:"); // Redis with in-memory fallback
-builder.AddMassTransitWithRabbitMq(); // RabbitMQ message bus (non-blocking startup)
+builder.AddMassTransitWithRabbitMq(cfg =>
+{
+    cfg.AddEntityFrameworkOutbox<SupplierDbContext>(o =>
+    {
+        o.UsePostgres();
+        o.UseBusOutbox();
+    });
+}); // RabbitMQ message bus (non-blocking startup)
 
 // --- API Configuration ---
 builder.AddDefaultCors(); // CORS from CORS:AllowedOrigins config
@@ -35,9 +48,9 @@ builder.AddJwtAuthentication();
 // --- Authorization ---
 builder.Services.AddPermissionAuthorization();
 
-// IAM Client & Registration
-builder.Services.AddIAMClient(builder.Configuration, "supplier-service");
-builder.Services.AddIAMRegistration<SupplierIAMRegistrationService>();
+// IAM Registration
+builder.AddIAMServiceClient("supplier");
+builder.Services.AddIAMRegistration<SupplierIAMRegistrationService>("supplier");
 
 // Add OpenAPI (must be in Program.cs for XML comments to work via source generator)
 if (!builder.Environment.IsProduction())
@@ -52,7 +65,14 @@ builder.Services.AddSupplierServices(builder.Configuration);
 builder.Services.AddExternalServiceClients(builder.Configuration);
 
 // Add controllers
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
+builder.Services.AddOpenApi();
 
 // Add rate limiting
 builder.Services.AddRateLimiter(options =>
@@ -78,7 +98,10 @@ await app.MigrateDatabaseAsync<SupplierDbContext>();
 app.UseStandardMiddleware();
 
 // Middleware Pipeline
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseCors();
 app.UseRateLimiter();
 

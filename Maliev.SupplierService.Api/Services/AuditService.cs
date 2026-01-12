@@ -11,7 +11,6 @@ namespace Maliev.SupplierService.Api.Services;
 /// </summary>
 public class AuditService : IAuditService
 {
-    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<AuditService> _logger;
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
@@ -24,16 +23,15 @@ public class AuditService : IAuditService
     /// <summary>
     /// Initializes a new instance of the <see cref="AuditService"/> class.
     /// </summary>
-    /// <param name="scopeFactory">The service scope factory for creating scoped DbContext instances.</param>
     /// <param name="logger">The logger instance.</param>
-    public AuditService(IServiceScopeFactory scopeFactory, ILogger<AuditService> logger)
+    public AuditService(ILogger<AuditService> logger)
     {
-        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
     /// <inheritdoc/>
-    public async Task LogChangeAsync(
+    public void LogChange(
+        SupplierDbContext context,
         Guid supplierId,
         string changeType,
         string entityType,
@@ -41,12 +39,8 @@ public class AuditService : IAuditService
         object? oldValues,
         object? newValues,
         string userId,
-        string userName,
-        CancellationToken cancellationToken = default)
+        string userName)
     {
-        using var scope = _scopeFactory.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<SupplierDbContext>();
-
         var auditLog = new SupplierAuditLog
         {
             Id = Guid.NewGuid(),
@@ -62,10 +56,9 @@ public class AuditService : IAuditService
         };
 
         context.SupplierAuditLogs.Add(auditLog);
-        await context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
-            "Audit log created: {ChangeType} {EntityType} {EntityId} by {UserName}",
+            "Audit log added to change tracker: {ChangeType} {EntityType} {EntityId} by {UserName}",
             changeType, entityType, entityId, userName);
     }
 }

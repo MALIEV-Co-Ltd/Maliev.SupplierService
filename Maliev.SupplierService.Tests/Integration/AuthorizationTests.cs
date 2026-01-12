@@ -21,8 +21,8 @@ public class AuthorizationTests : BaseIntegrationTest
     {
         // Arrange
         var adminClient = Factory.CreatePermissionAuthenticatedClient(
-            permissions: Roles.GetDefinitions()
-                .First(r => r.Name == Roles.Admin)
+            permissions: SupplierPredefinedRoles.All
+                .First(r => r.RoleId == SupplierPredefinedRoles.Admin)
                 .Permissions.ToArray());
 
         var request = new CreateSupplierRequest(
@@ -49,8 +49,8 @@ public class AuthorizationTests : BaseIntegrationTest
     {
         // Arrange
         var viewerClient = Factory.CreatePermissionAuthenticatedClient(
-            permissions: Roles.GetDefinitions()
-                .First(r => r.Name == Roles.Viewer)
+            permissions: SupplierPredefinedRoles.All
+                .First(r => r.RoleId == SupplierPredefinedRoles.Viewer)
                 .Permissions.ToArray());
 
         var request = new CreateSupplierRequest(
@@ -77,8 +77,8 @@ public class AuthorizationTests : BaseIntegrationTest
     {
         // Arrange
         var viewerClient = Factory.CreatePermissionAuthenticatedClient(
-            permissions: Roles.GetDefinitions()
-                .First(r => r.Name == Roles.Viewer)
+            permissions: SupplierPredefinedRoles.All
+                .First(r => r.RoleId == SupplierPredefinedRoles.Viewer)
                 .Permissions.ToArray());
 
         // Act
@@ -106,18 +106,14 @@ public class AuthorizationTests : BaseIntegrationTest
     {
         // Arrange
         var testUserId = Guid.NewGuid().ToString();
-        var coordinatorPermissions = Roles.GetDefinitions()
-            .First(r => r.Name == Roles.Coordinator)
+        var coordinatorPermissions = SupplierPredefinedRoles.All
+            .First(r => r.RoleId == SupplierPredefinedRoles.Coordinator)
             .Permissions.ToArray();
         var coordinatorClient = Factory.CreatePermissionAuthenticatedClient(
             userId: testUserId,
             permissions: coordinatorPermissions);
 
         var supplier = await CreateTestSupplierAsync();
-        // Since CreateTestSupplierAsync uses a different scope/user in its implementation, 
-        // let's ensure we have the fresh state and correct RowVersion
-        var db = GetDbContext();
-        var supplierFromDb = await db.Suppliers.FindAsync(supplier.Id);
 
         var updateRequest = new UpdateSupplierRequest(
             CompanyName: "Updated by Coordinator",
@@ -127,7 +123,7 @@ public class AuthorizationTests : BaseIntegrationTest
             PostalCode: null,
             MaterialCategoryIds: null,
             Capabilities: null,
-            RowVersion: supplierFromDb!.UpdatedAt.Ticks.ToString()
+            RowVersion: Convert.ToBase64String(supplier.RowVersion)
         );
 
         var rateRequest = new CreateEvaluationRequest(
@@ -150,8 +146,8 @@ public class AuthorizationTests : BaseIntegrationTest
     public async Task Viewer_CannotUpdateSupplier()
     {
         // Arrange
-        var viewerPermissions = Roles.GetDefinitions()
-            .First(r => r.Name == Roles.Viewer)
+        var viewerPermissions = SupplierPredefinedRoles.All
+            .First(r => r.RoleId == SupplierPredefinedRoles.Viewer)
             .Permissions.ToArray();
         var viewerClient = Factory.CreatePermissionAuthenticatedClient(permissions: viewerPermissions);
 
@@ -165,7 +161,7 @@ public class AuthorizationTests : BaseIntegrationTest
             PostalCode: null,
             MaterialCategoryIds: null,
             Capabilities: null,
-            RowVersion: supplier.UpdatedAt.Ticks.ToString()
+            RowVersion: Convert.ToBase64String(supplier.RowVersion)
         );
 
         // Act

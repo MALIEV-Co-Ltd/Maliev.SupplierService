@@ -16,6 +16,8 @@ using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
 using Testcontainers.Redis;
 using Xunit;
+using NSubstitute;
+using Maliev.SupplierService.Api.Services.ExternalServices;
 
 namespace Maliev.SupplierService.Tests.Testing;
 
@@ -91,25 +93,29 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         _containersStarted = true;
     }
 
-    public new async Task DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
-        // Explicitly stop MassTransit bus if it was started
-        if (Services != null)
-        {
-            var busControl = Services.GetService<IBusControl>();
-            if (busControl != null)
-            {
-                await busControl.StopAsync();
-            }
-        }
+        // 1. Dispose the application first (shut down host/hosted services)
+        // This ensures the app is stopped while containers are still running.
+        await base.DisposeAsync();
 
+        // 2. Dispose containers
         await _postgresContainer.DisposeAsync();
         await _redisContainer.DisposeAsync();
         await _rabbitmqContainer.DisposeAsync();
+
         _testRsa.Dispose();
-        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", null); // Cleanup
-        await base.DisposeAsync();
+
+        // Cleanup environment variables
+        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", null);
+        Environment.SetEnvironmentVariable($"ConnectionStrings__{DbConnectionStringName}", null);
+        Environment.SetEnvironmentVariable("ConnectionStrings__redis", null);
+        Environment.SetEnvironmentVariable("ConnectionStrings__rabbitmq", null);
+        Environment.SetEnvironmentVariable("Jwt__PublicKey", null);
     }
+
+    // Explicit implementation of IAsyncLifetime.DisposeAsync for xUnit 2.x
+    async Task IAsyncLifetime.DisposeAsync() => await DisposeAsync();
 
 
     protected override IHost CreateHost(IHostBuilder builder)
@@ -141,16 +147,16 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // Set environment variables BEFORE host builder processes configuration
-        // Using builder.UseSetting is more reliable than Environment.SetEnvironmentVariable 
-        // because it injects directly into the WebHost configuration that Program.cs reads.
-        builder.UseSetting($"ConnectionStrings:{DbConnectionStringName}", _postgresContainer.GetConnectionString());
-        builder.UseSetting("ConnectionStrings:redis", _redisContainer.GetConnectionString());
-        builder.UseSetting("ConnectionStrings:rabbitmq", _rabbitmqContainer.GetConnectionString());
-        builder.UseSetting("Features:PermissionBasedAuthEnabled", "true");
-
+        builder.UseEnvironment("Testing");
         builder.ConfigureTestServices(services =>
         {
+            // Configure SupplierDbContext to ignore pending model changes warning
+            services.PostConfigureAll<DbContextOptions<TDbContext>>(options =>
+            {
+                var builder = new DbContextOptionsBuilder<TDbContext>(options);
+                builder.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+            });
+
             // Configure JWT Bearer authentication with test RSA key
             services.PostConfigureAll<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>(options =>
             {
@@ -174,6 +180,23 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
 
             // Add MassTransit test harness for testing message publishing/consuming
             services.AddMassTransitTestHarness();
+
+            // Mock external service clients to return success (no references) by default
+            var poClient = Substitute.For<IPurchaseOrderServiceClient>();
+            poClient.CheckReferencesAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+                .Returns(new DependencyCheckResult(false, "PurchaseOrderService", 0, null, false));
+
+            var invoiceClient = Substitute.For<IInvoiceServiceClient>();
+            invoiceClient.CheckReferencesAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+                .Returns(new DependencyCheckResult(false, "InvoiceService", 0, null, false));
+
+            var materialClient = Substitute.For<IMaterialServiceClient>();
+            materialClient.CheckReferencesAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+                .Returns(new DependencyCheckResult(false, "MaterialService", 0, null, false));
+
+            services.AddSingleton(poClient);
+            services.AddSingleton(invoiceClient);
+            services.AddSingleton(materialClient);
 
             // Allow derived classes to add additional test services
             ConfigureAdditionalServices(services);
@@ -214,6 +237,7 @@ public class BaseIntegrationTestFactory<TProgram, TDbContext> : WebApplicationFa
         var connectionString = _postgresContainer.GetConnectionString();
         var optionsBuilder = new DbContextOptionsBuilder<TDbContext>();
         optionsBuilder.UseNpgsql(connectionString);
+        optionsBuilder.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
         return (TDbContext)Activator.CreateInstance(typeof(TDbContext), optionsBuilder.Options)!;
     }
 

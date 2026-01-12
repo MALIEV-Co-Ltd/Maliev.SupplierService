@@ -64,6 +64,10 @@ public class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
             .HasColumnName("updated_at")
             .IsRequired();
 
+        builder.Property(e => e.RowVersion)
+            .HasColumnName("row_version")
+            .IsConcurrencyToken();
+
         // Concurrency control removed for simplicity - use UpdatedAt for optimistic locking if needed
 
         // Indexes

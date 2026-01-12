@@ -23,7 +23,7 @@ public abstract class BaseIntegrationTest : IClassFixture<IntegrationTestWebAppF
         Client = factory.CreateClient();
 
         // Set JWT authorization header with all permissions by default
-        var token = factory.CreateTestJwtToken(permissions: Permissions.GetAll().Select(p => p.Id).ToArray());
+        var token = factory.CreateTestJwtToken(permissions: SupplierPermissions.All.ToArray());
         Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         JsonOptions = new JsonSerializerOptions
@@ -92,7 +92,10 @@ public abstract class BaseIntegrationTest : IClassFixture<IntegrationTestWebAppF
         dbContext.Suppliers.Add(supplier);
         await dbContext.SaveChangesAsync();
 
-        return supplier;
+        // Re-fetch to get database-generated properties like RowVersion
+        return await dbContext.Suppliers
+            .AsNoTracking()
+            .FirstAsync(s => s.Id == supplier.Id);
     }
 
     protected async Task<MaterialCategory> CreateTestCategoryAsync(string name = "Test Category")

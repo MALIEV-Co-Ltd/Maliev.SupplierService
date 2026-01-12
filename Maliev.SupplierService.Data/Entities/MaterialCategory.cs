@@ -11,7 +11,7 @@ namespace Maliev.SupplierService.Data.Entities;
 /// Indexes are configured in MaterialCategoryConfiguration.
 /// </remarks>
 [Table("material_categories")]
-public class MaterialCategory
+public class MaterialCategory : IAuditableEntity
 {
     [Key]
     [Column("id")]

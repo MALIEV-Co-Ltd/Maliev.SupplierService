@@ -42,7 +42,7 @@ public class SupplierEvaluationsController : ControllerBase
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The created evaluation.</returns>
     [HttpPost]
-    [RequirePermission(Permissions.Performance.Rate, PreValidateModel = true)]
+    [RequirePermission(SupplierPermissions.Performance.Rate, PreValidateModel = true)]
     [ProducesResponseType(typeof(EvaluationResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
@@ -94,7 +94,7 @@ public class SupplierEvaluationsController : ControllerBase
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A list of evaluations for the specified supplier.</returns>
     [HttpGet]
-    [RequirePermission(Permissions.Performance.View, PreValidateModel = true)]
+    [RequirePermission(SupplierPermissions.Performance.View, PreValidateModel = true)]
     [ProducesResponseType(typeof(EvaluationListResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<EvaluationListResponse>> GetEvaluations(
         Guid supplierId,

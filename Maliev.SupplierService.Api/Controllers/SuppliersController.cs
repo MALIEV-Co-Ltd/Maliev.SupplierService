@@ -41,7 +41,7 @@ public class SuppliersController : ControllerBase
     /// Register a new supplier
     /// </summary>
     [HttpPost]
-    [RequirePermission(Permissions.Suppliers.Create, PreValidateModel = true)]
+    [RequirePermission(SupplierPermissions.Suppliers.Create, PreValidateModel = true)]
     [ProducesResponseType(typeof(SupplierResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(object), StatusCodes.Status409Conflict)]
@@ -80,25 +80,18 @@ public class SuppliersController : ControllerBase
     /// List suppliers with pagination and filters
     /// </summary>
     [HttpGet]
-    [RequirePermission(Permissions.Suppliers.Read, PreValidateModel = true)]
+    [RequirePermission(SupplierPermissions.Suppliers.Read, PreValidateModel = true)]
     [ProducesResponseType(typeof(SupplierListResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<SupplierListResponse>> ListSuppliers(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20,
-        [FromQuery] Data.Enums.SupplierStatus? status = null,
-        [FromQuery] Guid? categoryId = null,
-        [FromQuery] string? capability = null,
-        [FromQuery] string? search = null,
-        [FromQuery] string sortBy = "CompanyName",
-        [FromQuery] string sortOrder = "asc",
+        [FromQuery] ListSuppliersRequest request,
         CancellationToken cancellationToken = default)
     {
         // Clamp page size
-        pageSize = Math.Clamp(pageSize, 1, 100);
-        page = Math.Max(1, page);
+        var pageSize = Math.Clamp(request.PageSize, 1, 100);
+        var page = Math.Max(1, request.Page);
 
         var (items, totalCount) = await _supplierService.ListSuppliersAsync(
-            page, pageSize, status, categoryId, capability, search, sortBy, sortOrder, cancellationToken);
+            page, pageSize, request.Status, request.CategoryId, request.Capability, request.Search, request.SortBy, request.SortOrder, cancellationToken);
 
         var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
 
@@ -116,7 +109,7 @@ public class SuppliersController : ControllerBase
     /// Get supplier details by ID
     /// </summary>
     [HttpGet("{id:guid}")]
-    [RequirePermission(Permissions.Suppliers.Read, PreValidateModel = true)]
+    [RequirePermission(SupplierPermissions.Suppliers.Read, PreValidateModel = true)]
     [ProducesResponseType(typeof(SupplierDetailResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<SupplierDetailResponse>> GetSupplier(
@@ -138,7 +131,7 @@ public class SuppliersController : ControllerBase
     /// Validate supplier exists (for service-to-service integration)
     /// </summary>
     [HttpGet("{id:guid}/validate")]
-    [RequirePermission(Permissions.Suppliers.Read, PreValidateModel = true)]
+    [RequirePermission(SupplierPermissions.Suppliers.Read, PreValidateModel = true)]
     [ProducesResponseType(typeof(SupplierValidationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<SupplierValidationResponse>> ValidateSupplier(
@@ -166,7 +159,7 @@ public class SuppliersController : ControllerBase
     /// Check supplier eligibility for purchase orders
     /// </summary>
     [HttpGet("{id:guid}/eligibility")]
-    [RequirePermission(Permissions.Suppliers.Read, PreValidateModel = true)]
+    [RequirePermission(SupplierPermissions.Suppliers.Read, PreValidateModel = true)]
     [ProducesResponseType(typeof(SupplierEligibilityResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<SupplierEligibilityResponse>> CheckEligibility(
@@ -189,7 +182,7 @@ public class SuppliersController : ControllerBase
     /// List all material categories
     /// </summary>
     [HttpGet("/supplier/v{version:apiVersion}/suppliers/categories")]
-    [RequirePermission(Permissions.Suppliers.Read, PreValidateModel = true)]
+    [RequirePermission(SupplierPermissions.Suppliers.Read, PreValidateModel = true)]
     [ProducesResponseType(typeof(MaterialCategoryListResponse), StatusCodes.Status200OK)]
     public async Task<ActionResult<MaterialCategoryListResponse>> GetCategories(
         CancellationToken cancellationToken)
@@ -206,7 +199,7 @@ public class SuppliersController : ControllerBase
     /// Update supplier information
     /// </summary>
     [HttpPut("{id:guid}")]
-    [RequirePermission(Permissions.Suppliers.Update, PreValidateModel = true)]
+    [RequirePermission(SupplierPermissions.Suppliers.Update, PreValidateModel = false)]
     [ProducesResponseType(typeof(SupplierResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
@@ -216,12 +209,18 @@ public class SuppliersController : ControllerBase
         [FromBody] UpdateSupplierRequest request,
         CancellationToken cancellationToken)
     {
+        if (!ModelState.IsValid)
+        {
+            var errors = string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage));
+            return BadRequest(new { message = $"Manual ModelState check failed: {errors}" });
+        }
+
         var userId = User.FindFirst("sub")?.Value ?? "anonymous";
         var userName = User.FindFirst("name")?.Value ?? "Anonymous User";
 
-        if (!long.TryParse(request.RowVersion, out var rowVersion))
+        if (!DecodeRowVersion(request.RowVersion, out var rowVersion, out var errorResponse))
         {
-            return BadRequest(new { message = "Invalid RowVersion format." });
+            return errorResponse!;
         }
 
         try
@@ -256,16 +255,28 @@ public class SuppliersController : ControllerBase
     /// Update supplier status
     /// </summary>
     [HttpPatch("{id:guid}/status")]
-    [RequirePermission(Permissions.Suppliers.Update, PreValidateModel = true)]
+    [RequirePermission(SupplierPermissions.Suppliers.Update, PreValidateModel = false)]
     [ProducesResponseType(typeof(SupplierResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<SupplierResponse>> UpdateStatus(
         Guid id,
         [FromBody] UpdateStatusRequest request,
         CancellationToken cancellationToken)
     {
+        if (!ModelState.IsValid)
+        {
+            var errors = string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage));
+            return BadRequest(new { message = $"Manual ModelState check failed: {errors}" });
+        }
+
         var userId = User.FindFirst("sub")?.Value ?? "anonymous";
         var userName = User.FindFirst("name")?.Value ?? "Anonymous User";
+
+        if (!DecodeRowVersion(request.RowVersion, out var rowVersion, out var errorResponse))
+        {
+            return errorResponse!;
+        }
 
         try
         {
@@ -273,6 +284,7 @@ public class SuppliersController : ControllerBase
                 id,
                 request.Status,
                 request.Reason,
+                rowVersion,
                 userId,
                 userName,
                 cancellationToken);
@@ -289,7 +301,7 @@ public class SuppliersController : ControllerBase
     /// Update supplier metadata (for external service callbacks)
     /// </summary>
     [HttpPatch("{id:guid}/metadata")]
-    [RequirePermission(Permissions.Suppliers.Update, PreValidateModel = true)]
+    [RequirePermission(SupplierPermissions.Suppliers.Update, PreValidateModel = false)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateMetadata(
@@ -317,7 +329,7 @@ public class SuppliersController : ControllerBase
     /// Delete supplier
     /// </summary>
     [HttpDelete("{id:guid}")]
-    [RequirePermission(Permissions.Suppliers.Delete, PreValidateModel = true)]
+    [RequirePermission(SupplierPermissions.Suppliers.Delete, PreValidateModel = true)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteSupplier(
@@ -335,6 +347,22 @@ public class SuppliersController : ControllerBase
         catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
         {
             return NotFound(new { message = ex.Message });
+        }
+    }
+
+    private bool DecodeRowVersion(string rowVersionStr, out byte[] rowVersion, out BadRequestObjectResult? errorResponse)
+    {
+        try
+        {
+            rowVersion = Convert.FromBase64String(rowVersionStr);
+            errorResponse = null;
+            return true;
+        }
+        catch (FormatException)
+        {
+            rowVersion = Array.Empty<byte>();
+            errorResponse = BadRequest(new { message = $"Invalid RowVersion format. Must be a Base64 string. Received: '{rowVersionStr}'" });
+            return false;
         }
     }
 }

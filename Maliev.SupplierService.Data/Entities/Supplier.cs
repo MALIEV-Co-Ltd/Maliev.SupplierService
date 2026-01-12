@@ -12,7 +12,7 @@ namespace Maliev.SupplierService.Data.Entities;
 /// Indexes are configured in SupplierConfiguration.
 /// </remarks>
 [Table("suppliers")]
-public class Supplier
+public class Supplier : IAuditableEntity
 {
     [Key]
     [Column("id")]
@@ -68,6 +68,9 @@ public class Supplier
     [Required]
     [Column("updated_at")]
     public DateTime UpdatedAt { get; set; }
+
+    [Column("row_version")]
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 
     // Navigation properties
     public ICollection<SupplierContact> Contacts { get; set; } = [];

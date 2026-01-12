@@ -12,7 +12,7 @@ namespace Maliev.SupplierService.Data.Entities;
 /// Indexes are configured in SupplierCertificationConfiguration.
 /// </remarks>
 [Table("supplier_certifications")]
-public class SupplierCertification
+public class SupplierCertification : IAuditableEntity
 {
     [Key]
     [Column("id")]
