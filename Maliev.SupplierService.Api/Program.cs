@@ -1,4 +1,3 @@
-#pragma warning disable CA1848 // For improved performance, use the LoggerMessage delegates
 using Maliev.Aspire.ServiceDefaults;
 using Maliev.SupplierService.Api.Extensions;
 using Maliev.SupplierService.Api.Services;
@@ -14,7 +13,7 @@ var bootstrapLogger = loggerFactory.CreateLogger("Program");
 
 try
 {
-    bootstrapLogger.LogInformation("Starting Supplier Service host");
+    Log.StartingHost(bootstrapLogger, "Supplier Service");
 
     var builder = WebApplication.CreateBuilder(args);
 
@@ -89,7 +88,7 @@ try
     {
         options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(
             context => RateLimitPartition.GetFixedWindowLimiter(
-                partitionKey: context.User?.Identity?.Name ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+                partitionKey: context.User?.Identity?.Name ?? context.Request.Headers.Host.ToString() ?? "anonymous",
                 factory: _ => new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = 100,
@@ -127,12 +126,12 @@ try
     // Map OpenAPI and Scalar documentation (dev/staging only)
     app.MapApiDocumentation(servicePrefix: "supplier");
 
-    logger.LogInformation("SupplierService started successfully");
+    Log.ServiceStarted(logger, "Supplier Service");
     await app.RunAsync();
 }
 catch (Exception ex)
 {
-    bootstrapLogger.LogCritical(ex, "Supplier Service host terminated unexpectedly during startup");
+    Log.HostTerminated(bootstrapLogger, ex, "Supplier Service");
     throw;
 }
 finally
@@ -143,4 +142,17 @@ finally
 /// <summary>
 /// Main program class for the Supplier Service API.
 /// </summary>
-public partial class Program { }
+public partial class Program
+{
+    internal static partial class Log
+    {
+        [LoggerMessage(Level = LogLevel.Information, Message = "Starting {ServiceName} host")]
+        public static partial void StartingHost(ILogger logger, string serviceName);
+
+        [LoggerMessage(Level = LogLevel.Critical, Message = "{ServiceName} host terminated unexpectedly during startup")]
+        public static partial void HostTerminated(ILogger logger, Exception ex, string serviceName);
+
+        [LoggerMessage(Level = LogLevel.Information, Message = "{ServiceName} started successfully")]
+        public static partial void ServiceStarted(ILogger logger, string serviceName);
+    }
+}
