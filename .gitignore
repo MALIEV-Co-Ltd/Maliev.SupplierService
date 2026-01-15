@@ -139,3 +139,4 @@ ApplicationInsights.config
 appsettings.Development.json
 docker-compose*.yml
 docker-compose.override.yml
+tmpclaude-*
