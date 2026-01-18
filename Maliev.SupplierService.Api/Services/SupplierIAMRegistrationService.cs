@@ -1,6 +1,5 @@
 using Maliev.Aspire.ServiceDefaults.IAM;
 using Maliev.SupplierService.Api.Constants;
-using Microsoft.Extensions.Logging;
 
 namespace Maliev.SupplierService.Api.Services;
 

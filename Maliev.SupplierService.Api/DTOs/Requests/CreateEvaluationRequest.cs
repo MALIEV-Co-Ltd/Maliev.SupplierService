@@ -1,6 +1,6 @@
-using System.ComponentModel.DataAnnotations;
 using Maliev.SupplierService.Api.Attributes;
 using Maliev.SupplierService.Data.Enums;
+using System.ComponentModel.DataAnnotations;
 
 namespace Maliev.SupplierService.Api.DTOs.Requests;
 
