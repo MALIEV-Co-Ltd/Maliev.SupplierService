@@ -1,7 +1,7 @@
-using Maliev.SupplierService.Data.Entities;
-using Microsoft.EntityFrameworkCore;
 using Maliev.Aspire.ServiceDefaults.Database;
+using Maliev.SupplierService.Data.Entities;
 using MassTransit;
+using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.SupplierService.Data;
 

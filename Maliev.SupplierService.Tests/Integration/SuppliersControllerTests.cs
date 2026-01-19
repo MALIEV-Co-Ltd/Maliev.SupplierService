@@ -250,17 +250,86 @@ public class SuppliersControllerTests : BaseIntegrationTest
         // Act
         var response = await Client.PatchAsJsonAsync($"/supplier/v1/suppliers/{supplier.Id}/status", request);
 
-        // Debug
-        if (response.StatusCode == HttpStatusCode.BadRequest)
-        {
-            var content = await response.Content.ReadAsStringAsync();
-            throw new Xunit.Sdk.XunitException($"UpdateStatus BadRequest Details: {content}");
-        }
-
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var result = await GetResponseAsync<SupplierResponse>(response);
         Assert.Equal(SupplierStatus.Active, result!.Status);
+    }
+
+    [Fact]
+    public async Task ListSuppliers_WithSearch_ReturnsMatching()
+    {
+        // Arrange
+        await CreateTestSupplierAsync("Specific Name", "TAX-SPECIFIC");
+        await CreateTestSupplierAsync("Other Name", "TAX-OTHER");
+
+        // Act
+        var response = await Client.GetAsync("/supplier/v1/suppliers?search=Specific");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await GetResponseAsync<SupplierListResponse>(response);
+        Assert.NotNull(result);
+        Assert.Contains(result!.Items, s => s.CompanyName == "Specific Name");
+        Assert.DoesNotContain(result.Items, s => s.CompanyName == "Other Name");
+    }
+
+    [Fact]
+    public async Task GetCategories_ReturnsSuccess()
+    {
+        // Act
+        var response = await Client.GetAsync("/supplier/v1/suppliers/categories");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await GetResponseAsync<MaterialCategoryListResponse>(response);
+        Assert.NotNull(result);
+    }
+
+    [Fact]
+    public async Task UpdateMetadata_ReturnsNoContent()
+    {
+        // Arrange
+        var supplier = await CreateTestSupplierAsync();
+        var request = new UpdateMetadataRequest(DateTime.UtcNow, 5000m);
+
+        // Act
+        var response = await Client.PatchAsJsonAsync($"/supplier/v1/suppliers/{supplier.Id}/metadata", request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ValidateSupplier_ReturnsOk()
+    {
+        // Arrange
+        var supplier = await CreateTestSupplierAsync();
+
+        // Act
+        var response = await Client.GetAsync($"/supplier/v1/suppliers/{supplier.Id}/validate");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await GetResponseAsync<SupplierValidationResponse>(response);
+        Assert.NotNull(result);
+        Assert.Equal(supplier.Id, result!.Id);
+    }
+
+    [Fact]
+    public async Task CheckEligibility_ReturnsOk()
+    {
+        // Arrange
+        var supplier = await CreateTestSupplierAsync(status: SupplierStatus.Active);
+
+        // Act
+        var response = await Client.GetAsync($"/supplier/v1/suppliers/{supplier.Id}/eligibility");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await GetResponseAsync<SupplierEligibilityResponse>(response);
+        Assert.NotNull(result);
+        Assert.True(result!.IsEligible);
     }
 }

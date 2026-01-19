@@ -4,7 +4,6 @@ using Maliev.SupplierService.Api.Services;
 using Maliev.SupplierService.Data;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using System.Threading.RateLimiting;
 
 // Initialize bootstrap logging
@@ -81,7 +80,6 @@ try
             options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
             options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
         });
-    builder.Services.AddOpenApi();
 
     // Add rate limiting
     builder.Services.AddRateLimiter(options =>

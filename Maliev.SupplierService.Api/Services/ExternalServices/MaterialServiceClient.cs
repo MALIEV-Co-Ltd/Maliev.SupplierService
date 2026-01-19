@@ -1,5 +1,3 @@
-using System.Net.Http.Json;
-
 namespace Maliev.SupplierService.Api.Services.ExternalServices;
 
 /// <summary>

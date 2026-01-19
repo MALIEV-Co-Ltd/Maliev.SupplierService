@@ -1,8 +1,8 @@
 using Asp.Versioning;
-using Maliev.SupplierService.Api.DTOs.Responses;
-using Maliev.SupplierService.Api.Constants;
-using Maliev.SupplierService.Api.Services;
 using Maliev.Aspire.ServiceDefaults.Authorization;
+using Maliev.SupplierService.Api.Constants;
+using Maliev.SupplierService.Api.DTOs.Responses;
+using Maliev.SupplierService.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

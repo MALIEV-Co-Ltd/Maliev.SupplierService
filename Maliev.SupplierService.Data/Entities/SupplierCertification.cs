@@ -1,6 +1,6 @@
+using Maliev.SupplierService.Data.Enums;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Maliev.SupplierService.Data.Enums;
 
 namespace Maliev.SupplierService.Data.Entities;
 

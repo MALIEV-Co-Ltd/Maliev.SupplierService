@@ -1,15 +1,10 @@
-using System.Text;
-
 using Maliev.SupplierService.Api.Configuration;
 using Maliev.SupplierService.Api.Services;
 using Maliev.SupplierService.Api.Services.ExternalServices;
-using Maliev.SupplierService.Data;
-using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Http.Resilience;
 using Microsoft.IdentityModel.Tokens;
-using StackExchange.Redis;
+using System.Text;
 
 namespace Maliev.SupplierService.Api.Extensions;
 

@@ -1,12 +1,12 @@
-using Maliev.SupplierService.Api.DTOs.Requests;
-using Maliev.SupplierService.Data;
+using Maliev.Aspire.ServiceDefaults.Caching;
 using Maliev.MessagingContracts.Generated;
+using Maliev.SupplierService.Api.DTOs.Requests;
+using Maliev.SupplierService.Api.Services.ExternalServices;
+using Maliev.SupplierService.Data;
 using Maliev.SupplierService.Data.Entities;
 using Maliev.SupplierService.Data.Enums;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
-using Maliev.Aspire.ServiceDefaults.Caching;
-using Maliev.SupplierService.Api.Services.ExternalServices;
 
 namespace Maliev.SupplierService.Api.Services;
 
@@ -247,10 +247,12 @@ public class SupplierService : ISupplierService
             Email = request.Email,
             Role = request.Role,
             Phone = request.Phone,
-            IsPrimary = request.IsPrimary
+            IsPrimary = request.IsPrimary,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
-        supplier.Contacts.Add(contact);
+        _context.SupplierContacts.Add(contact);
 
         // Log audit
         _auditService.LogChange(
@@ -260,7 +262,7 @@ public class SupplierService : ISupplierService
             nameof(SupplierContact),
             contact.Id,
             null,
-            contact,
+            new { contact.Id, contact.Name, contact.Email, contact.Role, contact.Phone, contact.IsPrimary },
             userId,
             userName);
 
@@ -839,7 +841,7 @@ public class SupplierService : ISupplierService
             nameof(SupplierCertification),
             certification.Id,
             null,
-            certification,
+            new { certification.Id, certification.DocumentType, certification.DocumentName, certification.IssueDate, certification.ExpirationDate },
             userId,
             userName);
 
@@ -887,7 +889,7 @@ public class SupplierService : ISupplierService
             "DELETE_CERTIFICATION",
             nameof(SupplierCertification),
             certificationId,
-            certification,
+            new { certification.Id, certification.DocumentType, certification.DocumentName },
             null,
             userId,
             userName);
@@ -992,7 +994,7 @@ public class SupplierService : ISupplierService
             nameof(PerformanceEvaluation),
             evaluation.Id,
             null,
-            evaluation,
+            new { evaluation.Id, evaluation.RatingCategory, evaluation.Score, evaluation.EvaluationDate },
             userId,
             userName);
 
@@ -1225,7 +1227,7 @@ public class SupplierService : ISupplierService
             "DELETE",
             nameof(Supplier),
             id,
-            supplier,
+            new { supplier.Id, supplier.CompanyName, supplier.TaxId },
             null,
             userId,
             userName);

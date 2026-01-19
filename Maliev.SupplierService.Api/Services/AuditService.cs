@@ -1,8 +1,8 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Maliev.SupplierService.Data;
 using Maliev.SupplierService.Data.Entities;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Maliev.SupplierService.Api.Services;
 

@@ -1,12 +1,10 @@
 using Asp.Versioning;
-
+using Maliev.Aspire.ServiceDefaults.Authorization;
+using Maliev.SupplierService.Api.Constants;
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
-using Maliev.SupplierService.Api.Constants;
 using Maliev.SupplierService.Api.Mapping;
 using Maliev.SupplierService.Api.Services;
-using Maliev.SupplierService.Data.Entities;
-using Maliev.Aspire.ServiceDefaults.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -331,6 +329,7 @@ public class SuppliersController : ControllerBase
     [HttpDelete("{id:guid}")]
     [RequirePermission(SupplierPermissions.Suppliers.Delete, PreValidateModel = true)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(DependencyErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteSupplier(
         Guid id,
@@ -344,9 +343,21 @@ public class SuppliersController : ControllerBase
             await _supplierService.DeleteAsync(id, userId, userName, cancellationToken);
             return NoContent();
         }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+        catch (InvalidOperationException ex)
         {
-            return NotFound(new { message = ex.Message });
+            if (ex.Message.Contains("not found"))
+            {
+                return NotFound(new { message = ex.Message });
+            }
+
+            if (ex.Message.Contains("referenced by"))
+            {
+                var depsPart = ex.Message.Split(": ")[1];
+                var deps = depsPart.Split(", ").Select(d => new DependencyInfo(d, 0)).ToList();
+                return BadRequest(new DependencyErrorResponse(ex.Message, deps));
+            }
+
+            return BadRequest(new { message = ex.Message });
         }
     }
 
