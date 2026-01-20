@@ -4,7 +4,7 @@ WORKDIR /src
 
 # Copy nuget.config and project files
 COPY ["nuget.config", "."]
-COPY ["Maliev.SupplierService.sln", "."]
+COPY ["Maliev.SupplierService.slnx", "."]
 COPY ["Maliev.SupplierService.Api/Maliev.SupplierService.Api.csproj", "Maliev.SupplierService.Api/"]
 COPY ["Maliev.SupplierService.Data/Maliev.SupplierService.Data.csproj", "Maliev.SupplierService.Data/"]
 
