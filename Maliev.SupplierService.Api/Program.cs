@@ -4,8 +4,6 @@ using Maliev.SupplierService.Api.Services;
 using Maliev.SupplierService.Data;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
-using System.Threading.RateLimiting;
-
 // Initialize bootstrap logging
 using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
 var bootstrapLogger = loggerFactory.CreateLogger("Program");
@@ -36,7 +34,7 @@ try
             }
         },
         connectionName: "SupplierDbContext"); // PostgreSQL with retry logic
-    builder.AddRedisDistributedCache(instanceName: "supplier:"); // Redis with in-memory fallback
+    builder.AddStandardCache("supplier:"); // Redis + in-memory fallback, memory-optimized // Redis with in-memory fallback
     builder.AddMassTransitWithRabbitMq(cfg =>
     {
         cfg.AddEntityFrameworkOutbox<SupplierDbContext>(o =>
@@ -47,7 +45,7 @@ try
     }); // RabbitMQ message bus (non-blocking startup)
 
     // --- API Configuration ---
-    builder.AddDefaultCors(); // CORS from CORS:AllowedOrigins config
+    builder.AddStandardCors(); // CORS with fail-fast validation
     builder.AddDefaultApiVersioning(); // API versioning with URL segment reader
 
     // JWT Authentication (tests override via PostConfigureAll with dynamic RSA keys)
@@ -82,19 +80,7 @@ try
         });
 
     // Add rate limiting
-    builder.Services.AddRateLimiter(options =>
-    {
-        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(
-            context => RateLimitPartition.GetFixedWindowLimiter(
-                partitionKey: context.User?.Identity?.Name ?? context.Request.Headers.Host.ToString() ?? "anonymous",
-                factory: _ => new FixedWindowRateLimiterOptions
-                {
-                    PermitLimit = 100,
-                    Window = TimeSpan.FromMinutes(1),
-                    QueueLimit = 10
-                }));
-    });
-
+    builder.AddStandardRateLimiting(); // Memory-optimized for low-spec nodes
     var app = builder.Build();
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
