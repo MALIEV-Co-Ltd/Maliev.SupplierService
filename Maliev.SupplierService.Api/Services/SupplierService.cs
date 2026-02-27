@@ -1,6 +1,6 @@
 using Maliev.Aspire.ServiceDefaults.Caching;
 using Maliev.MessagingContracts.Contracts.Suppliers;
-using Maliev.MessagingContracts.Generated;
+using Maliev.MessagingContracts;
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.Services.ExternalServices;
 using Maliev.SupplierService.Data;
