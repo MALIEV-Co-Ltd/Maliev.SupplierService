@@ -39,7 +39,7 @@ try
         connectionName: "SupplierDbContext"); // PostgreSQL with retry logic
 
     builder.AddStandardCache("supplier:"); // Redis + in-memory fallback, memory-optimized
-    
+
     builder.AddMassTransitWithRabbitMq(cfg =>
     {
         cfg.AddEntityFrameworkOutbox<SupplierDbContext>(o =>
@@ -86,7 +86,7 @@ try
 
     // Add rate limiting
     builder.AddStandardRateLimiting(); // Memory-optimized for low-spec nodes
-    
+
     var app = builder.Build();
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
 

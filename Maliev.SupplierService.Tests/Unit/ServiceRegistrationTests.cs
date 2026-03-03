@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Maliev.SupplierService.Tests.Unit;
+
 public class ServiceRegistrationTests
 {
     [Fact]

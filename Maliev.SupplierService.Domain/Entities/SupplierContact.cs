@@ -11,6 +11,6 @@ public class SupplierContact
     public bool IsPrimary { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
-    
+
     public Supplier Supplier { get; set; } = null!;
 }

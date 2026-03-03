@@ -12,6 +12,6 @@ public class PerformanceEvaluation
     public DateOnly EvaluationDate { get; set; }
     public string EvaluatorId { get; set; } = string.Empty;
     public string EvaluatorName { get; set; } = string.Empty;
-    
+
     public Supplier Supplier { get; set; } = null!;
 }

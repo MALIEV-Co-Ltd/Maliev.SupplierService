@@ -70,7 +70,7 @@ public class SupplierDbContext : DbContext, ISupplierDbContext
             .WithMany()
             .HasForeignKey(a => a.SupplierId)
             .OnDelete(DeleteBehavior.Cascade);
-            
+
         // Table names
         modelBuilder.Entity<Supplier>().ToTable("Suppliers");
         modelBuilder.Entity<SupplierContact>().ToTable("SupplierContacts");

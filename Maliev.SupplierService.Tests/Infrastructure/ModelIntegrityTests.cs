@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Maliev.SupplierService.Tests.Infrastructure;
+
 public class ModelIntegrityTests
 {
     [Fact]

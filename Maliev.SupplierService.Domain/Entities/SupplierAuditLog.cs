@@ -12,6 +12,6 @@ public class SupplierAuditLog
     public string PerformedBy { get; set; } = string.Empty;
     public string PerformedByName { get; set; } = string.Empty;
     public DateTime Timestamp { get; set; }
-    
+
     public Supplier Supplier { get; set; } = null!;
 }

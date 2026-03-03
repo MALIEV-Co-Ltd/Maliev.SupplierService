@@ -3,6 +3,7 @@ using Maliev.SupplierService.Api.DTOs.Responses;
 using Xunit;
 
 namespace Maliev.SupplierService.Tests.Unit;
+
 public class DtoModelTests
 {
     [Fact]

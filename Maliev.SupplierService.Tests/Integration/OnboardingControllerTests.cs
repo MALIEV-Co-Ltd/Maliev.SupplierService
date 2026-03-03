@@ -40,7 +40,7 @@ public class OnboardingControllerTests : BaseIntegrationTest
     {
         // Arrange
         var supplier = await CreateTestSupplierAsync();
-        
+
         // Advance stage to create history
         var request = new AdvanceOnboardingRequest(
             TargetStage: OnboardingStage.Reviewing,

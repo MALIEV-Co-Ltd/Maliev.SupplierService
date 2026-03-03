@@ -14,7 +14,7 @@ public interface ISupplierDbContext
     DbSet<SupplierCertification> SupplierCertifications { get; }
     DbSet<PerformanceEvaluation> PerformanceEvaluations { get; }
     DbSet<SupplierAuditLog> SupplierAuditLogs { get; }
-    
+
     EntityEntry Entry(object entity);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

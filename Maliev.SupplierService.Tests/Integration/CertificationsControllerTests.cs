@@ -93,7 +93,7 @@ public class CertificationsControllerTests : BaseIntegrationTest
     {
         // Arrange
         var supplier = await CreateTestSupplierAsync();
-        
+
         // One expiring soon (10 days)
         var expiringRequest = new CreateCertificationRequest(
             DocumentType: CertificationType.InsuranceCertificate,
@@ -103,7 +103,7 @@ public class CertificationsControllerTests : BaseIntegrationTest
             ExternalFileRef: null,
             Notes: null
         );
-        
+
         // One not expiring soon (60 days)
         var stableRequest = new CreateCertificationRequest(
             DocumentType: CertificationType.QualityCertification,

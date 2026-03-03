@@ -11,6 +11,6 @@ public class OnboardingStatus
     public string TransitionedByName { get; set; } = string.Empty;
     public DateTime TransitionedAt { get; set; }
     public string? Notes { get; set; }
-    
+
     public Supplier Supplier { get; set; } = null!;
 }

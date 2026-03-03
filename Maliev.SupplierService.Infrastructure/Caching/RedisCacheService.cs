@@ -61,7 +61,7 @@ public class RedisCacheService : ICacheService
         // In a real MALIEV service, this would use IConnectionMultiplexer to SCAN and DEL.
         // For migration purposes, we log this limitation and remove the literal key if it's not a wildcard.
         _logger.LogWarning("RemoveByPatternAsync called with pattern {Pattern}. IDistributedCache fallback used.", pattern);
-        
+
         if (!pattern.Contains('*'))
         {
             await _cache.RemoveAsync(pattern, cancellationToken);

@@ -12,6 +12,6 @@ public class SupplierCertification
     public DateOnly? ExpirationDate { get; set; }
     public string? ExternalFileRef { get; set; }
     public string? Notes { get; set; }
-    
+
     public Supplier Supplier { get; set; } = null!;
 }
