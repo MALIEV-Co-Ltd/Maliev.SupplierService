@@ -2,8 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using Maliev.SupplierService.Api.Constants;
 using Maliev.SupplierService.Api.DTOs.Requests;
-using Maliev.SupplierService.Data.Enums;
+using Maliev.SupplierService.Application.DTOs.Requests;
+using Maliev.SupplierService.Domain.Enums;
 using Maliev.SupplierService.Tests.Integration.Infrastructure;
+using Xunit;
 
 namespace Maliev.SupplierService.Tests.Integration;
 

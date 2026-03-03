@@ -8,9 +8,7 @@ namespace Maliev.SupplierService.Tests.Integration.Infrastructure;
 
 public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {
-    public const string SchemeName = "TestScheme";
-    public const string DefaultUserId = "test-user-id";
-    public const string DefaultUserName = "Test User";
+    public const string AuthenticationScheme = "Test";
 
     public TestAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
@@ -24,16 +22,23 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
     {
         var claims = new[]
         {
-            new Claim(ClaimTypes.NameIdentifier, DefaultUserId),
-            new Claim("sub", DefaultUserId),
-            new Claim("name", DefaultUserName),
-            new Claim(ClaimTypes.Name, DefaultUserName),
-            new Claim(ClaimTypes.Role, "Admin")
+            new Claim(ClaimTypes.Name, "Test User"),
+            new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+            new Claim("sub", Guid.NewGuid().ToString()),
+            new Claim("permissions", "supplier.suppliers.read"),
+            new Claim("permissions", "supplier.suppliers.create"),
+            new Claim("permissions", "supplier.suppliers.update"),
+            new Claim("permissions", "supplier.suppliers.delete"),
+            new Claim("permissions", "supplier.suppliers.approve"),
+            new Claim("permissions", "supplier.contacts.create"),
+            new Claim("permissions", "supplier.certifications.manage"),
+            new Claim("permissions", "supplier.performance.rate"),
+            new Claim("permissions", "supplier.performance.view")
         };
 
-        var identity = new ClaimsIdentity(claims, SchemeName);
+        var identity = new ClaimsIdentity(claims, AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);
-        var ticket = new AuthenticationTicket(principal, SchemeName);
+        var ticket = new AuthenticationTicket(principal, AuthenticationScheme);
 
         return Task.FromResult(AuthenticateResult.Success(ticket));
     }

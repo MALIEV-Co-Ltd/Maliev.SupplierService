@@ -30,10 +30,13 @@ Always verify changes by running builds and tests.
 Adhere strictly to the existing style found in `Maliev.SupplierService.Api` and `Maliev.SupplierService.Data`.
 
 ### General Architecture
-- **Layered Architecture:**
-  - **Api:** Controllers, DTOs, Service Implementations, Extensions.
-  - **Data:** EF Core Entities, Context, Enums, Migrations.
-  - **Tests:** Integration and Unit tests using xUnit.
+**Architecture**: Clean Architecture (Api, Application, Domain, Infrastructure, Tests)
+
+- **Api:** Controllers, DTOs, Middleware.
+- **Application:** Use cases, handlers, DTOs.
+- **Domain:** Entities, interfaces, value objects.
+- **Infrastructure:** EF Core, repositories.
+- **Tests:** Integration and Unit tests using xUnit.
 - **Dependency Injection:** Use constructor injection for all dependencies.
 - **Asynchrony:** Use `async/await` for all I/O-bound operations. Avoid `.Result` or `.Wait()`.
 

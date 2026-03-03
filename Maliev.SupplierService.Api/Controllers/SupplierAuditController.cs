@@ -2,7 +2,7 @@ using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.SupplierService.Api.Constants;
 using Maliev.SupplierService.Api.DTOs.Responses;
-using Maliev.SupplierService.Api.Services;
+using Maliev.SupplierService.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,7 +14,6 @@ namespace Maliev.SupplierService.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("supplier/v{version:apiVersion}/suppliers/{supplierId:guid}/audit")]
-[Authorize]
 public class SupplierAuditController : ControllerBase
 {
     private readonly ISupplierService _supplierService;
@@ -53,13 +52,13 @@ public class SupplierAuditController : ControllerBase
         var response = new AuditLogListResponse(
             items.Select(a => new AuditLogResponse(
                 a.Id,
-                a.ChangeType,
+                a.Action,
                 a.EntityType,
                 a.EntityId,
                 a.OldValues,
                 a.NewValues,
-                a.ChangedBy,
-                a.ChangedByName,
+                a.PerformedBy,
+                a.PerformedByName,
                 a.Timestamp)).ToList(),
             totalCount,
             page,

@@ -1,10 +1,10 @@
-using Maliev.SupplierService.Data;
-using Maliev.SupplierService.Data.Entities;
-using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Maliev.SupplierService.Application.Interfaces;
+using Maliev.SupplierService.Domain.Entities;
+using Microsoft.Extensions.Logging;
 
-namespace Maliev.SupplierService.Api.Services;
+namespace Maliev.SupplierService.Application.Services;
 
 /// <summary>
 /// Provides services for logging audit trail entries related to supplier activities.
@@ -31,34 +31,34 @@ public class AuditService : IAuditService
 
     /// <inheritdoc/>
     public void LogChange(
-        SupplierDbContext context,
+        ISupplierDbContext context,
         Guid supplierId,
-        string changeType,
+        string action,
         string entityType,
         Guid entityId,
         object? oldValues,
         object? newValues,
-        string userId,
-        string userName)
+        string performedBy,
+        string performedByName)
     {
         var auditLog = new SupplierAuditLog
         {
             Id = Guid.NewGuid(),
             SupplierId = supplierId,
-            ChangeType = changeType,
+            Action = action,
             EntityType = entityType,
             EntityId = entityId,
             OldValues = oldValues is null ? null : JsonSerializer.Serialize(oldValues, SerializerOptions),
             NewValues = newValues is null ? null : JsonSerializer.Serialize(newValues, SerializerOptions),
-            ChangedBy = userId,
-            ChangedByName = userName,
+            PerformedBy = performedBy,
+            PerformedByName = performedByName,
             Timestamp = DateTime.UtcNow
         };
 
         context.SupplierAuditLogs.Add(auditLog);
 
         _logger.LogInformation(
-            "Audit log added to change tracker: {ChangeType} {EntityType} {EntityId} by {UserName}",
-            changeType, entityType, entityId, userName);
+            "Audit log added to change tracker: {Action} {EntityType} {EntityId} by {PerformedByName}",
+            action, entityType, entityId, performedByName);
     }
 }

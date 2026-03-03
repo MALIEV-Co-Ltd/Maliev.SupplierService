@@ -1,4 +1,4 @@
-using Maliev.SupplierService.Data.Enums;
+using Maliev.SupplierService.Domain.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace Maliev.SupplierService.Api.DTOs.Requests;

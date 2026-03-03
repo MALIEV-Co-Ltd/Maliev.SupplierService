@@ -4,7 +4,9 @@ using Maliev.SupplierService.Api.Constants;
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
 using Maliev.SupplierService.Api.Mapping;
-using Maliev.SupplierService.Api.Services;
+using Maliev.SupplierService.Application.Interfaces;
+using Maliev.SupplierService.Application.DTOs.Requests;
+using Maliev.SupplierService.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,7 +18,6 @@ namespace Maliev.SupplierService.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("supplier/v{version:apiVersion}/suppliers")]
-[Authorize]
 public class SuppliersController : ControllerBase
 {
     private readonly ISupplierService _supplierService;
@@ -148,7 +149,7 @@ public class SuppliersController : ControllerBase
             supplier.CompanyName,
             supplier.TaxId,
             supplier.Status,
-            supplier.Status == Data.Enums.SupplierStatus.Active);
+            supplier.Status == SupplierStatus.Active);
 
         return Ok(response);
     }
@@ -188,7 +189,7 @@ public class SuppliersController : ControllerBase
         var categories = await _supplierService.GetMaterialCategoriesAsync(cancellationToken);
 
         var response = new MaterialCategoryListResponse(
-            categories.Select(c => new MaterialCategoryResponse(c.Id, c.Name, c.Description)).ToList());
+            categories.Select(c => new MaterialCategoryResponse(c.Id, c.Name, string.Empty)).ToList());
 
         return Ok(response);
     }

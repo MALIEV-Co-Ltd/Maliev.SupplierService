@@ -3,7 +3,7 @@ using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.SupplierService.Api.Constants;
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
-using Maliev.SupplierService.Api.Services;
+using Maliev.SupplierService.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +15,6 @@ namespace Maliev.SupplierService.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("supplier/v{version:apiVersion}/suppliers/{supplierId:guid}/certifications")]
-[Authorize]
 public class SupplierCertificationsController : ControllerBase
 {
     private readonly ISupplierService _supplierService;
@@ -78,7 +77,7 @@ public class SupplierCertificationsController : ControllerBase
                 certification.ExternalFileRef,
                 certification.ExpirationDate.HasValue && certification.ExpirationDate.Value < today,
                 certification.ExpirationDate.HasValue && certification.ExpirationDate.Value <= today.AddDays(30),
-                certification.CreatedAt);
+                DateTime.UtcNow);
 
             return CreatedAtAction(
                 nameof(AddCertification),
@@ -134,7 +133,6 @@ public class SupplierCertificationsController : ControllerBase
 [ApiController]
 [ApiVersion("1.0")]
 [Route("supplier/v{version:apiVersion}/certifications")]
-[Authorize]
 public class CertificationsController : ControllerBase
 {
     private readonly ISupplierService _supplierService;
