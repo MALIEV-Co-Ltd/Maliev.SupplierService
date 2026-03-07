@@ -105,7 +105,7 @@ To maintain high performance and low complexity, the following are **NOT** used:
 - ✅ **EF Core Design Package**: `Microsoft.EntityFrameworkCore.Design` must ONLY be in the Infrastructure project where migrations are located. NEVER add it to the Api project.
 - ✅ **EF Migrations**: Create migrations using Infrastructure as both the project and startup project:
   ```bash
-  dotnet ef migrations add <Name> --project Maliev.SupplierService.Infrastructure --startup-project Maliev.SupplierService.Api
+  dotnet ef migrations add <Name> --project Maliev.SupplierService.Infrastructure --startup-project Maliev.SupplierService.Infrastructure
   ```
 
 ## 4. Workflow Rules
@@ -125,9 +125,9 @@ To maintain high performance and low complexity, the following are **NOT** used:
 ### EF Core Design Package
 - ❌ `Microsoft.EntityFrameworkCore.Design` MUST NOT be in Api projects
 - ✅ It belongs ONLY in the Infrastructure (or Data) project where migrations live
-- Migration commands must target Infrastructure, not Api:
+- Migration commands must target Infrastructure as both project and startup-project (since EF Core Design package is in Infrastructure):
   ```
-  dotnet ef migrations add <Name> --project Maliev.<Domain>Service.Infrastructure --startup-project ../Maliev.<Domain>Service.Api
+  dotnet ef migrations add <Name> --project Maliev.<Domain>Service.Infrastructure --startup-project Maliev.<Domain>Service.Infrastructure
   ```
 
 ### PostgreSQL xmin Concurrency — Mandatory Pattern
