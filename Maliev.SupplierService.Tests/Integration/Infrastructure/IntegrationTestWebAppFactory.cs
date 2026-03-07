@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using DotNet.Testcontainers.Builders;
+using Maliev.Aspire.ServiceDefaults.IAM;
 using Maliev.SupplierService.Application.Interfaces;
 using Maliev.SupplierService.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication;
@@ -153,6 +154,20 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
             services.AddSingleton(poClient);
             services.AddSingleton(invoiceClient);
             services.AddSingleton(materialClient);
+
+            // Replace the real IAM HTTP client with a no-op stub so Polly retries
+            // against the unreachable iamservice:80 host do not slow down tests.
+            // PermissionAuthorizationHandler will fall back to JWT claims immediately.
+            var iamClient = Substitute.For<IIamServiceClient>();
+            iamClient.CheckPermissionAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult(false));
+            iamClient.GetUserPermissionsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult<IEnumerable<string>>([]));
+            iamClient.CheckPermissionsAsync(Arg.Any<string>(), Arg.Any<IEnumerable<PermissionCheckRequest>>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult(new Dictionary<string, bool>()));
+            iamClient.GetAuthorizedResourcesAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult<IEnumerable<string>>([]));
+            services.AddScoped<IIamServiceClient>(_ => iamClient);
         });
     }
 
