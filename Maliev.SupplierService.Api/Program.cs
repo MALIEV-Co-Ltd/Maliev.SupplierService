@@ -1,9 +1,12 @@
 using Maliev.Aspire.ServiceDefaults;
 using Maliev.SupplierService.Api.Extensions;
 using Maliev.SupplierService.Api.Services;
-using Maliev.SupplierService.Data;
+using Maliev.SupplierService.Application;
+using Maliev.SupplierService.Infrastructure;
+using Maliev.SupplierService.Infrastructure.Persistence;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
+
 // Initialize bootstrap logging
 using var loggerFactory = LoggerFactory.Create(logBuilder => logBuilder.AddConsole());
 var bootstrapLogger = loggerFactory.CreateLogger("Program");
@@ -25,7 +28,7 @@ try
     });
     builder.AddServiceMeters("suppliers-meter"); // Register service meters for OpenTelemetry business metrics
 
-    builder.AddPostgresDbContext<Maliev.SupplierService.Data.SupplierDbContext>(
+    builder.AddPostgresDbContext<SupplierDbContext>(
         configureOptions: options =>
         {
             if (builder.Environment.IsEnvironment("Testing"))
@@ -34,15 +37,25 @@ try
             }
         },
         connectionName: "SupplierDbContext"); // PostgreSQL with retry logic
-    builder.AddStandardCache("supplier:"); // Redis + in-memory fallback, memory-optimized // Redis with in-memory fallback
-    builder.AddMassTransitWithRabbitMq(cfg =>
+
+    builder.AddStandardCache("supplier:"); // Redis + in-memory fallback, memory-optimized
+
+    // Configure MassTransit - skip outbox in Testing environment
+    if (!builder.Environment.IsEnvironment("Testing"))
     {
-        cfg.AddEntityFrameworkOutbox<SupplierDbContext>(o =>
+        builder.AddMassTransitWithRabbitMq(cfg =>
         {
-            o.UsePostgres();
-            o.UseBusOutbox();
+            cfg.AddEntityFrameworkOutbox<SupplierDbContext>(o =>
+            {
+                o.UsePostgres();
+                o.UseBusOutbox();
+            });
         });
-    }); // RabbitMQ message bus (non-blocking startup)
+    }
+    else
+    {
+        builder.AddMassTransitWithRabbitMq();
+    } // RabbitMQ message bus (non-blocking startup)
 
     // --- API Configuration ---
     builder.AddStandardCors(); // CORS with fail-fast validation
@@ -66,9 +79,9 @@ try
             description: "Supplier relationship management service. Manages supplier registration and onboarding, contact information, certification tracking with expiry alerts, performance evaluations, eligibility checks for purchase orders, and status management (active/inactive/suspended).");
     }
 
-    // Add services
-    builder.Services.AddSupplierServices(builder.Configuration);
-    builder.Services.AddExternalServiceClients(builder.Configuration);
+    // --- Layer Registration ---
+    builder.Services.AddApplication();
+    builder.Services.AddInfrastructure(builder.Configuration);
 
     // Add controllers
     builder.Services.AddControllers()
@@ -81,11 +94,15 @@ try
 
     // Add rate limiting
     builder.AddStandardRateLimiting(); // Memory-optimized for low-spec nodes
+
     var app = builder.Build();
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
     // --- Database Migrations ---
-    await app.MigrateDatabaseAsync<SupplierDbContext>();
+    if (!app.Environment.IsEnvironment("Testing"))
+    {
+        await app.MigrateDatabaseAsync<SupplierDbContext>();
+    }
 
     // Use custom middleware
     app.UseStandardMiddleware();

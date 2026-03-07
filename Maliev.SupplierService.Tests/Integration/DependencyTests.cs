@@ -1,8 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using Maliev.SupplierService.Api.DTOs.Responses;
-using Maliev.SupplierService.Api.Services.ExternalServices;
+using Maliev.SupplierService.Application.Interfaces;
 using Maliev.SupplierService.Tests.Integration.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Xunit;
 
@@ -20,12 +21,12 @@ public class DependencyTests : BaseIntegrationTest
     public async Task DeleteSupplier_WithInvoices_Returns400Conflict()
     {
         // Arrange
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, _) = await CreateTestSupplierAsync();
 
         // Mock InvoiceService to return references
-        var invoiceClient = Factory.Services.GetService(typeof(IInvoiceServiceClient)) as IInvoiceServiceClient;
-        invoiceClient!.CheckReferencesAsync(supplier.Id, Arg.Any<CancellationToken>())
-            .Returns(new DependencyCheckResult(true, "InvoiceService", 5, null, false));
+        var invoiceClient = Factory.Services.GetRequiredService<IInvoiceServiceClient>();
+        invoiceClient.CheckReferencesAsync(supplier.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult((true, false)));
 
         // Act
         var response = await Client.DeleteAsync($"/supplier/v1/suppliers/{supplier.Id}");
@@ -33,30 +34,26 @@ public class DependencyTests : BaseIntegrationTest
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var content = await response.Content.ReadAsStringAsync();
-        var error = System.Text.Json.JsonSerializer.Deserialize<DependencyErrorResponse>(content, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-        Assert.NotNull(error);
-        Assert.NotNull(error!.Dependencies);
-        Assert.Contains("InvoiceService", error.Dependencies.Select(d => d.ServiceName));
+        Assert.Contains("referenced by: InvoiceService", content);
     }
 
     [Fact]
     public async Task DeleteSupplier_WithPurchaseOrders_Returns400Conflict()
     {
         // Arrange
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, _) = await CreateTestSupplierAsync();
 
         // Mock PurchaseOrderService to return references
-        var poClient = Factory.Services.GetService(typeof(IPurchaseOrderServiceClient)) as IPurchaseOrderServiceClient;
-        poClient!.CheckReferencesAsync(supplier.Id, Arg.Any<CancellationToken>())
-            .Returns(new DependencyCheckResult(true, "PurchaseOrderService", 3, null, false));
+        var poClient = Factory.Services.GetRequiredService<IPurchaseOrderServiceClient>();
+        poClient.CheckReferencesAsync(supplier.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult((true, false)));
 
         // Act
         var response = await Client.DeleteAsync($"/supplier/v1/suppliers/{supplier.Id}");
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var error = await response.Content.ReadFromJsonAsync<DependencyErrorResponse>();
-        Assert.NotNull(error);
-        Assert.Contains("PurchaseOrderService", error!.Dependencies.Select(d => d.ServiceName));
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("referenced by: PurchaseOrderService", content);
     }
 }

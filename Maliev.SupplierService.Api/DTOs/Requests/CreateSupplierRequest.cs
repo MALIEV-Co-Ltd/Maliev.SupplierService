@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Maliev.SupplierService.Application.DTOs.Requests;
 
 namespace Maliev.SupplierService.Api.DTOs.Requests;
 

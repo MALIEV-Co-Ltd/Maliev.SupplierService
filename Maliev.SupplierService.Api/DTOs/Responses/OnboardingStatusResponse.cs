@@ -1,6 +1,6 @@
 namespace Maliev.SupplierService.Api.DTOs.Responses;
 
-using Maliev.SupplierService.Data.Enums;
+using Maliev.SupplierService.Domain.Enums;
 
 /// <summary>
 /// Represents a single entry in a supplier's onboarding status history.

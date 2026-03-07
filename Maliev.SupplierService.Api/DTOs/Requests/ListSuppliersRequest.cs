@@ -1,6 +1,6 @@
 namespace Maliev.SupplierService.Api.DTOs.Requests;
 
-using Maliev.SupplierService.Data.Enums;
+using Maliev.SupplierService.Domain.Enums;
 
 /// <summary>
 /// Represents a request to list suppliers with optional filtering, sorting, and pagination.

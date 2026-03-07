@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
-using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
+using Maliev.SupplierService.Application.DTOs.Requests;
 using Maliev.SupplierService.Tests.Integration.Infrastructure;
 using Xunit;
 
@@ -19,7 +19,7 @@ public class SupplierContactsControllerTests : BaseIntegrationTest
     public async Task AddContact_WithValidData_Returns201()
     {
         // Arrange
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, _) = await CreateTestSupplierAsync();
         var request = new CreateContactRequest(
             Name: "Jane Smith",
             Email: "jane@example.com",
@@ -31,11 +31,6 @@ public class SupplierContactsControllerTests : BaseIntegrationTest
         var response = await Client.PostAsJsonAsync($"/supplier/v1/suppliers/{supplier.Id}/contacts", request);
 
         // Assert
-        if (response.StatusCode != HttpStatusCode.Created)
-        {
-            var content = await response.Content.ReadAsStringAsync();
-            throw new Exception($"Request failed with {response.StatusCode}: {content}");
-        }
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var contact = await GetResponseAsync<ContactResponse>(response);
         Assert.NotNull(contact);
@@ -46,7 +41,7 @@ public class SupplierContactsControllerTests : BaseIntegrationTest
     public async Task GetContacts_ReturnsList()
     {
         // Arrange
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, _) = await CreateTestSupplierAsync();
         var request = new CreateContactRequest(
             Name: "Jane Smith",
             Email: "jane@example.com",

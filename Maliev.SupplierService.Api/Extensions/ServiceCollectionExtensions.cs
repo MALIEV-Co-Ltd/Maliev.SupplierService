@@ -1,8 +1,5 @@
 using Maliev.SupplierService.Api.Configuration;
-using Maliev.SupplierService.Api.Services;
-using Maliev.SupplierService.Api.Services.ExternalServices;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
@@ -13,32 +10,6 @@ namespace Maliev.SupplierService.Api.Extensions;
 /// </summary>
 public static class ServiceCollectionExtensions
 {
-    /// <summary>
-    /// Adds core supplier-related services, configuration, database contexts, validators, and business services.
-    /// </summary>
-    /// <param name="services">The <see cref="IServiceCollection"/> to add the services to.</param>
-    /// <param name="configuration">The application's configuration.</param>
-    /// <returns>The <see cref="IServiceCollection"/> for chaining.</returns>
-    public static IServiceCollection AddSupplierServices(
-        this IServiceCollection services,
-        IConfiguration configuration)
-    {
-        // Configuration
-        services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
-        services.Configure<RedisSettings>(configuration.GetSection(RedisSettings.SectionName));
-        services.Configure<RabbitMQSettings>(configuration.GetSection(RabbitMQSettings.SectionName));
-
-        // Note: Database is now configured via builder.AddPostgresDbContext<SupplierDbContext>() in Program.cs
-
-
-
-        // Services
-        services.AddScoped<ISupplierService, Services.SupplierService>();
-        services.AddScoped<IAuditService, AuditService>();
-
-        return services;
-    }
-
     /// <summary>
     /// Adds JWT authentication to the service collection, configuring JWT bearer options.
     /// </summary>
@@ -104,24 +75,6 @@ public static class ServiceCollectionExtensions
             options.GroupNameFormat = "'v'V";
             options.SubstituteApiVersionInUrl = true;
         });
-
-        return services;
-    }
-
-    /// <summary>
-    /// Adds HTTP clients for external services with configured base addresses, timeouts, and standard resilience policies.
-    /// </summary>
-    /// <param name="services">The <see cref="IServiceCollection"/> to add the services to.</param>
-    /// <param name="configuration">The application's configuration.</param>
-    /// <returns>The <see cref="IServiceCollection"/> for chaining.</returns>
-    public static IServiceCollection AddExternalServiceClients(
-        this IServiceCollection services,
-        IConfiguration configuration)
-    {
-        // Use standardized helpers from ServiceDefaults
-        services.AddServiceClient<IPurchaseOrderServiceClient, PurchaseOrderServiceClient>(configuration, "PurchaseOrderService");
-        services.AddServiceClient<IInvoiceServiceClient, InvoiceServiceClient>(configuration, "InvoiceService");
-        services.AddServiceClient<IMaterialServiceClient, MaterialServiceClient>(configuration, "MaterialService");
 
         return services;
     }

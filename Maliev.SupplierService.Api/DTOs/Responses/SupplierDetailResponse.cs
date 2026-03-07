@@ -1,6 +1,6 @@
 namespace Maliev.SupplierService.Api.DTOs.Responses;
 
-using Maliev.SupplierService.Data.Enums;
+using Maliev.SupplierService.Domain.Enums;
 
 /// <summary>
 /// Provides comprehensive details about a supplier, including contact information, material categories, capabilities, certifications, and a performance summary.

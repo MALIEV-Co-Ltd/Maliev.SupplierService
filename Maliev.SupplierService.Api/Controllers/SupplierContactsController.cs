@@ -1,9 +1,9 @@
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.SupplierService.Api.Constants;
-using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
-using Maliev.SupplierService.Api.Services;
+using Maliev.SupplierService.Application.Interfaces;
+using Maliev.SupplierService.Application.DTOs.Requests;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +15,6 @@ namespace Maliev.SupplierService.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("supplier/v{version:apiVersion}/suppliers/{supplierId:guid}/contacts")]
-[Authorize]
 public class SupplierContactsController : ControllerBase
 {
     private readonly ISupplierService _supplierService;
@@ -105,7 +104,7 @@ public class SupplierContactsController : ControllerBase
         Guid supplierId,
         CancellationToken cancellationToken)
     {
-        var supplier = await _supplierService.GetByIdAsync(supplierId, cancellationToken);
+        var (supplier, _) = await _supplierService.GetByIdAsync(supplierId, cancellationToken);
         if (supplier is null)
         {
             return NotFound(new { message = $"Supplier with ID {supplierId} not found" });

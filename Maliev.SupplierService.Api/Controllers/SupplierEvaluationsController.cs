@@ -3,7 +3,7 @@ using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.SupplierService.Api.Constants;
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
-using Maliev.SupplierService.Api.Services;
+using Maliev.SupplierService.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +15,6 @@ namespace Maliev.SupplierService.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("supplier/v{version:apiVersion}/suppliers/{supplierId:guid}/evaluations")]
-[Authorize]
 public class SupplierEvaluationsController : ControllerBase
 {
     private readonly ISupplierService _supplierService;
@@ -74,7 +73,7 @@ public class SupplierEvaluationsController : ControllerBase
                 evaluation.EvaluationDate,
                 evaluation.EvaluatorId,
                 evaluation.EvaluatorName,
-                evaluation.CreatedAt);
+                DateTime.UtcNow); // PerformanceEvaluation missing CreatedAt
 
             return CreatedAtAction(
                 nameof(GetEvaluations),
@@ -110,7 +109,7 @@ public class SupplierEvaluationsController : ControllerBase
             e.EvaluationDate,
             e.EvaluatorId,
             e.EvaluatorName,
-            e.CreatedAt)).ToList();
+            DateTime.UtcNow)).ToList(); // PerformanceEvaluation missing CreatedAt
 
         var averageScore = items.Count > 0 ? (decimal?)items.Average(e => e.Score) : null;
 

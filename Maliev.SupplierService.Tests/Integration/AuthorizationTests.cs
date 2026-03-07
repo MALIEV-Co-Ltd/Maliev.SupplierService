@@ -2,8 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using Maliev.SupplierService.Api.Constants;
 using Maliev.SupplierService.Api.DTOs.Requests;
-using Maliev.SupplierService.Data.Enums;
+using Maliev.SupplierService.Application.DTOs.Requests;
+using Maliev.SupplierService.Domain.Enums;
 using Maliev.SupplierService.Tests.Integration.Infrastructure;
+using Xunit;
 
 namespace Maliev.SupplierService.Tests.Integration;
 
@@ -113,7 +115,7 @@ public class AuthorizationTests : BaseIntegrationTest
             userId: testUserId,
             permissions: coordinatorPermissions);
 
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, xmin) = await CreateTestSupplierAsync();
 
         var updateRequest = new UpdateSupplierRequest(
             CompanyName: "Updated by Coordinator",
@@ -123,7 +125,7 @@ public class AuthorizationTests : BaseIntegrationTest
             PostalCode: null,
             MaterialCategoryIds: null,
             Capabilities: null,
-            RowVersion: Convert.ToBase64String(supplier.RowVersion)
+            RowVersion: xmin.ToString()
         );
 
         var rateRequest = new CreateEvaluationRequest(
@@ -151,7 +153,7 @@ public class AuthorizationTests : BaseIntegrationTest
             .Permissions.ToArray();
         var viewerClient = Factory.CreatePermissionAuthenticatedClient(permissions: viewerPermissions);
 
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, xmin) = await CreateTestSupplierAsync();
 
         var updateRequest = new UpdateSupplierRequest(
             CompanyName: "Attempted Update",
@@ -161,7 +163,7 @@ public class AuthorizationTests : BaseIntegrationTest
             PostalCode: null,
             MaterialCategoryIds: null,
             Capabilities: null,
-            RowVersion: Convert.ToBase64String(supplier.RowVersion)
+            RowVersion: xmin.ToString()
         );
 
         // Act

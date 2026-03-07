@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Maliev.SupplierService.Api.DTOs.Responses;
-using Maliev.SupplierService.Data.Entities;
+using Maliev.SupplierService.Domain.Entities;
 using Maliev.SupplierService.Tests.Integration.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -20,21 +20,21 @@ public class SupplierAuditControllerTests : BaseIntegrationTest
     public async Task GetAuditTrail_ReturnsAuditLogs()
     {
         // Arrange
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, _) = await CreateTestSupplierAsync();
 
         using (var scope = Factory.Services.CreateScope())
         {
-            var dbContext = scope.ServiceProvider.GetRequiredService<Maliev.SupplierService.Data.SupplierDbContext>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<Maliev.SupplierService.Infrastructure.Persistence.SupplierDbContext>();
             dbContext.SupplierAuditLogs.Add(new SupplierAuditLog
             {
                 Id = Guid.NewGuid(),
                 SupplierId = supplier.Id,
-                ChangeType = "Created",
+                Action = "Created",
                 EntityType = "Supplier",
                 EntityId = supplier.Id,
                 NewValues = "{\"CompanyName\": \"Test\"}",
-                ChangedBy = Guid.NewGuid().ToString(),
-                ChangedByName = "Admin",
+                PerformedBy = Guid.NewGuid().ToString(),
+                PerformedByName = "Admin",
                 Timestamp = DateTime.UtcNow
             });
             await dbContext.SaveChangesAsync();

@@ -3,7 +3,7 @@ using Maliev.Aspire.ServiceDefaults.Authorization;
 using Maliev.SupplierService.Api.Constants;
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
-using Maliev.SupplierService.Api.Services;
+using Maliev.SupplierService.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +15,6 @@ namespace Maliev.SupplierService.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("supplier/v{version:apiVersion}/suppliers/{supplierId:guid}/onboarding")]
-[Authorize]
 public class SupplierOnboardingController : ControllerBase
 {
     private readonly ISupplierService _supplierService;
@@ -52,7 +51,7 @@ public class SupplierOnboardingController : ControllerBase
 
         try
         {
-            var supplier = await _supplierService.AdvanceOnboardingAsync(
+            var (supplier, xmin) = await _supplierService.AdvanceOnboardingAsync(
                 supplierId,
                 request.TargetStage,
                 request.Notes,
@@ -72,7 +71,7 @@ public class SupplierOnboardingController : ControllerBase
                 supplier.OnboardingStage,
                 supplier.CreatedAt,
                 supplier.UpdatedAt,
-                supplier.UpdatedAt.Ticks.ToString()));
+                xmin.ToString()));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
         {
@@ -94,7 +93,7 @@ public class SupplierOnboardingController : ControllerBase
         Guid supplierId,
         CancellationToken cancellationToken)
     {
-        var supplier = await _supplierService.GetByIdAsync(supplierId, cancellationToken);
+        var (supplier, _) = await _supplierService.GetByIdAsync(supplierId, cancellationToken);
         if (supplier is null)
         {
             return NotFound(new { message = $"Supplier with ID {supplierId} not found" });

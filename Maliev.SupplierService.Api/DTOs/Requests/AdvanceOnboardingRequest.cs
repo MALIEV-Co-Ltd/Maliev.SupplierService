@@ -1,6 +1,6 @@
 namespace Maliev.SupplierService.Api.DTOs.Requests;
 
-using Maliev.SupplierService.Data.Enums;
+using Maliev.SupplierService.Domain.Enums;
 
 /// <summary>
 /// Represents a request to advance a supplier's onboarding process to a new stage.

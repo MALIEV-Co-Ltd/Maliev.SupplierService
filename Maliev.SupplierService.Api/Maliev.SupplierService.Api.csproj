@@ -22,7 +22,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Maliev.SupplierService.Data\Maliev.SupplierService.Data.csproj" />
+    <ProjectReference Include="..\Maliev.SupplierService.Application\Maliev.SupplierService.Application.csproj" />
+    <ProjectReference Include="..\Maliev.SupplierService.Infrastructure\Maliev.SupplierService.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MassTransit.EntityFrameworkCore" Version="[8.5.8, 9.0.0)" />
   </ItemGroup>
 
 </Project>

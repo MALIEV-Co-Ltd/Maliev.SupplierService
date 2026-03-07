@@ -1,120 +1,74 @@
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Maliev.SupplierService.Api.Constants;
-using Maliev.SupplierService.Data;
-using Maliev.SupplierService.Data.Entities;
-using Maliev.SupplierService.Data.Enums;
+using Maliev.SupplierService.Domain.Entities;
+using Maliev.SupplierService.Domain.Enums;
+using Maliev.SupplierService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
 namespace Maliev.SupplierService.Tests.Integration.Infrastructure;
 
-public abstract class BaseIntegrationTest : IClassFixture<IntegrationTestWebAppFactory>, IAsyncLifetime
+public abstract class BaseIntegrationTest : IAsyncLifetime
 {
     protected readonly IntegrationTestWebAppFactory Factory;
     protected readonly HttpClient Client;
-    protected readonly JsonSerializerOptions JsonOptions;
+    protected readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     protected BaseIntegrationTest(IntegrationTestWebAppFactory factory)
     {
         Factory = factory;
-        Client = factory.CreateClient();
-
-        // Set JWT authorization header with all permissions by default
-        var token = factory.CreateTestJwtToken(permissions: SupplierPermissions.All.ToArray());
-        Client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        JsonOptions = new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        };
-        JsonOptions.Converters.Add(new JsonStringEnumConverter());
+        Client = factory.CreateAuthenticatedClient();
     }
 
-    public virtual Task InitializeAsync() => Task.CompletedTask;
-
-    public virtual async Task DisposeAsync()
+    public Task InitializeAsync()
     {
-        // Clean up database after each test
-        await CleanupDatabaseAsync();
+        return Task.CompletedTask;
     }
 
-    protected async Task CleanupDatabaseAsync()
+    public Task DisposeAsync()
+    {
+        Client.Dispose();
+        return Task.CompletedTask;
+    }
+
+    // Phase 3: Transaction support for test isolation
+    protected async Task RunInTransactionAsync(Func<Task> testAction)
     {
         using var scope = Factory.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<SupplierDbContext>();
+        var context = scope.ServiceProvider.GetRequiredService<SupplierDbContext>();
 
-        // Delete in correct order to respect FK constraints
-        await dbContext.SupplierAuditLogs.ExecuteDeleteAsync();
-        await dbContext.OnboardingStatuses.ExecuteDeleteAsync();
-        await dbContext.PerformanceEvaluations.ExecuteDeleteAsync();
-        await dbContext.SupplierCertifications.ExecuteDeleteAsync();
-        await dbContext.SupplierCapabilities.ExecuteDeleteAsync();
-        await dbContext.SupplierContacts.ExecuteDeleteAsync();
-
-        // Clear many-to-many relationship
-        await dbContext.Database.ExecuteSqlRawAsync(
-            "DELETE FROM supplier_material_categories");
-
-        await dbContext.Suppliers.ExecuteDeleteAsync();
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        try
+        {
+            await testAction();
+        }
+        finally
+        {
+            await transaction.RollbackAsync();
+        }
     }
 
-    protected SupplierDbContext GetDbContext()
-    {
-        var scope = Factory.Services.CreateScope();
-        return scope.ServiceProvider.GetRequiredService<SupplierDbContext>();
-    }
-
-    protected async Task<Supplier> CreateTestSupplierAsync(
-        string companyName = "Test Company",
-        string taxId = "TEST123456",
-        SupplierStatus status = SupplierStatus.PendingApproval)
+    protected async Task<T> RunInTransactionAsync<T>(Func<Task<T>> testAction)
     {
         using var scope = Factory.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<SupplierDbContext>();
+        var context = scope.ServiceProvider.GetRequiredService<SupplierDbContext>();
 
-        var supplier = new Supplier
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        try
         {
-            Id = Guid.NewGuid(),
-            CompanyName = companyName,
-            TaxId = taxId,
-            Address = "123 Test Street",
-            City = "Test City",
-            Country = "Test Country",
-            PostalCode = "12345",
-            Status = status,
-            OnboardingStage = OnboardingStage.PendingApproval
-        };
-
-        dbContext.Suppliers.Add(supplier);
-        await dbContext.SaveChangesAsync();
-
-        // Re-fetch to get database-generated properties like RowVersion
-        return await dbContext.Suppliers
-            .AsNoTracking()
-            .FirstAsync(s => s.Id == supplier.Id);
-    }
-
-    protected async Task<MaterialCategory> CreateTestCategoryAsync(string name = "Test Category")
-    {
-        using var scope = Factory.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<SupplierDbContext>();
-
-        var category = new MaterialCategory
+            return await testAction();
+        }
+        finally
         {
-            Id = Guid.NewGuid(),
-            Name = name,
-            Description = "Test category description",
-            IsActive = true
-        };
-
-        dbContext.MaterialCategories.Add(category);
-        await dbContext.SaveChangesAsync();
-
-        return category;
+            await transaction.RollbackAsync();
+        }
     }
 
     protected async Task<T?> GetResponseAsync<T>(HttpResponseMessage response)
@@ -123,9 +77,56 @@ public abstract class BaseIntegrationTest : IClassFixture<IntegrationTestWebAppF
         return JsonSerializer.Deserialize<T>(content, JsonOptions);
     }
 
-    protected StringContent CreateJsonContent<T>(T data)
+    protected async Task<(Supplier Supplier, uint Xmin)> CreateTestSupplierAsync(
+        string name = "Test Supplier",
+        string taxId = null!)
     {
-        var json = JsonSerializer.Serialize(data, JsonOptions);
-        return new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        taxId ??= Guid.NewGuid().ToString().Substring(0, 8);
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<SupplierDbContext>();
+
+        var supplier = new Supplier
+        {
+            Id = Guid.NewGuid(),
+            CompanyName = name,
+            TaxId = taxId,
+            Address = "123 Test St",
+            City = "Test City",
+            Country = "Test Country",
+            Status = SupplierStatus.PendingApproval,
+            OnboardingStage = OnboardingStage.PendingApproval,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        context.Suppliers.Add(supplier);
+        await context.SaveChangesAsync();
+
+        // Reload to get the xmin value from the database
+        await context.Entry(supplier).ReloadAsync();
+
+        // Get the xmin value from the shadow property
+        var xminValue = context.Entry(supplier).Property<uint>("xmin").CurrentValue;
+
+        return (supplier, xminValue);
+    }
+
+    protected async Task<MaterialCategory> CreateTestCategoryAsync(string name = "Test Category")
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<SupplierDbContext>();
+
+        var category = new MaterialCategory
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            Description = "Test Description",
+            IsActive = true
+        };
+
+        context.MaterialCategories.Add(category);
+        await context.SaveChangesAsync();
+
+        return category;
     }
 }

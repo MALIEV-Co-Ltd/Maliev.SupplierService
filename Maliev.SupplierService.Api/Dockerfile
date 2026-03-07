@@ -6,7 +6,9 @@ WORKDIR /src
 COPY ["nuget.config", "."]
 COPY ["Maliev.SupplierService.slnx", "."]
 COPY ["Maliev.SupplierService.Api/Maliev.SupplierService.Api.csproj", "Maliev.SupplierService.Api/"]
-COPY ["Maliev.SupplierService.Data/Maliev.SupplierService.Data.csproj", "Maliev.SupplierService.Data/"]
+COPY ["Maliev.SupplierService.Application/Maliev.SupplierService.Application.csproj", "Maliev.SupplierService.Application/"]
+COPY ["Maliev.SupplierService.Domain/Maliev.SupplierService.Domain.csproj", "Maliev.SupplierService.Domain/"]
+COPY ["Maliev.SupplierService.Infrastructure/Maliev.SupplierService.Infrastructure.csproj", "Maliev.SupplierService.Infrastructure/"]
 
 # Restore with GitHub Packages authentication using BuildKit secrets
 RUN --mount=type=secret,id=nuget_username \
@@ -17,7 +19,9 @@ RUN --mount=type=secret,id=nuget_username \
 
 # Copy source code
 COPY ["Maliev.SupplierService.Api/", "Maliev.SupplierService.Api/"]
-COPY ["Maliev.SupplierService.Data/", "Maliev.SupplierService.Data/"]
+COPY ["Maliev.SupplierService.Application/", "Maliev.SupplierService.Application/"]
+COPY ["Maliev.SupplierService.Domain/", "Maliev.SupplierService.Domain/"]
+COPY ["Maliev.SupplierService.Infrastructure/", "Maliev.SupplierService.Infrastructure/"]
 
 # Build the application
 WORKDIR /src/Maliev.SupplierService.Api
