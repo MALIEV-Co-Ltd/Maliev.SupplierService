@@ -115,7 +115,7 @@ public class AuthorizationTests : BaseIntegrationTest
             userId: testUserId,
             permissions: coordinatorPermissions);
 
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, xmin) = await CreateTestSupplierAsync();
 
         var updateRequest = new UpdateSupplierRequest(
             CompanyName: "Updated by Coordinator",
@@ -125,7 +125,7 @@ public class AuthorizationTests : BaseIntegrationTest
             PostalCode: null,
             MaterialCategoryIds: null,
             Capabilities: null,
-            RowVersion: Convert.ToBase64String(supplier.RowVersion)
+            RowVersion: xmin.ToString()
         );
 
         var rateRequest = new CreateEvaluationRequest(
@@ -153,7 +153,7 @@ public class AuthorizationTests : BaseIntegrationTest
             .Permissions.ToArray();
         var viewerClient = Factory.CreatePermissionAuthenticatedClient(permissions: viewerPermissions);
 
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, xmin) = await CreateTestSupplierAsync();
 
         var updateRequest = new UpdateSupplierRequest(
             CompanyName: "Attempted Update",
@@ -163,7 +163,7 @@ public class AuthorizationTests : BaseIntegrationTest
             PostalCode: null,
             MaterialCategoryIds: null,
             Capabilities: null,
-            RowVersion: Convert.ToBase64String(supplier.RowVersion)
+            RowVersion: xmin.ToString()
         );
 
         // Act

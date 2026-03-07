@@ -20,7 +20,7 @@ public class OnboardingControllerTests : BaseIntegrationTest
     public async Task AdvanceOnboarding_ValidTransition_Returns200()
     {
         // Arrange
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, _) = await CreateTestSupplierAsync();
         var request = new AdvanceOnboardingRequest(
             TargetStage: OnboardingStage.Reviewing,
             Notes: "Moving to review stage"
@@ -39,7 +39,7 @@ public class OnboardingControllerTests : BaseIntegrationTest
     public async Task GetOnboardingHistory_ReturnsHistory()
     {
         // Arrange
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, _) = await CreateTestSupplierAsync();
 
         // Advance stage to create history
         var request = new AdvanceOnboardingRequest(

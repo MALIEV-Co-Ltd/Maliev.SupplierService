@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using DotNet.Testcontainers.Builders;
 using Maliev.SupplierService.Application.Interfaces;
 using Maliev.SupplierService.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication;
@@ -6,6 +7,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -13,8 +15,6 @@ using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
 using Testcontainers.Redis;
 using Xunit;
-
-[assembly: Xunit.CollectionBehavior(DisableTestParallelization = true)]
 
 namespace Maliev.SupplierService.Tests.Integration.Infrastructure;
 
@@ -28,10 +28,15 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
     private string? _redisConnectionString;
     private string? _rabbitMqConnectionString;
 
+    // Phase 3: Transaction support
+    private IDbContextTransaction? _currentTransaction;
+
     public IntegrationTestWebAppFactory()
     {
+        // Phase 2: Optimized container configuration
         _postgresContainer = new PostgreSqlBuilder()
             .WithImage("postgres:18-alpine")
+            .WithDatabase("supplier_test")
             .Build();
 
         _redisContainer = new RedisBuilder()
@@ -42,20 +47,41 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
             .WithImage("rabbitmq:4.2-alpine")
             .Build();
 
-        _postgresContainer.StartAsync().GetAwaiter().GetResult();
-        _redisContainer.StartAsync().GetAwaiter().GetResult();
-        _rabbitMqContainer.StartAsync().GetAwaiter().GetResult();
-
-        _connectionString = _postgresContainer.GetConnectionString();
-        _redisConnectionString = _redisContainer.GetConnectionString();
-        _rabbitMqConnectionString = _rabbitMqContainer.GetConnectionString();
     }
 
     public string ConnectionString => _connectionString ?? throw new InvalidOperationException("Connection string not initialized");
 
-    public Task InitializeAsync()
+    // Phase 3: Transaction support methods
+    public IDbContextTransaction? CurrentTransaction => _currentTransaction;
+
+    public async Task<IDbContextTransaction> BeginTransactionAsync(IServiceProvider serviceProvider)
     {
-        return Task.CompletedTask;
+        var context = serviceProvider.GetRequiredService<SupplierDbContext>();
+        _currentTransaction = await context.Database.BeginTransactionAsync();
+        return _currentTransaction;
+    }
+
+    public async Task RollbackTransactionAsync()
+    {
+        if (_currentTransaction != null)
+        {
+            await _currentTransaction.RollbackAsync();
+            await _currentTransaction.DisposeAsync();
+            _currentTransaction = null;
+        }
+    }
+
+    public async Task InitializeAsync()
+    {
+        await Task.WhenAll(
+            _postgresContainer.StartAsync(),
+            _redisContainer.StartAsync(),
+            _rabbitMqContainer.StartAsync()
+        );
+
+        _connectionString = _postgresContainer.GetConnectionString();
+        _redisConnectionString = _redisContainer.GetConnectionString();
+        _rabbitMqConnectionString = _rabbitMqContainer.GetConnectionString();
     }
 
     Task IAsyncLifetime.DisposeAsync()
@@ -65,6 +91,7 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
 
     public override async ValueTask DisposeAsync()
     {
+        await base.DisposeAsync();
         await _postgresContainer.DisposeAsync();
         await _redisContainer.DisposeAsync();
         await _rabbitMqContainer.DisposeAsync();
@@ -80,7 +107,9 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
                 ["ConnectionStrings:SupplierDbContext"] = ConnectionString,
                 ["ConnectionStrings:redis"] = _redisConnectionString,
                 ["ConnectionStrings:rabbitmq"] = _rabbitMqConnectionString,
-                ["CORS:AllowedOrigins:0"] = "http://localhost:5000"
+                ["CORS:AllowedOrigins:0"] = "http://localhost:5000",
+                ["IAM:Url"] = "http://iamservice",
+                ["Jwt:SecurityKey"] = "test-secret-key-for-integration-tests-minimum-32-chars"
             })
             .Build();
 
@@ -88,16 +117,23 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
 
         builder.ConfigureTestServices(services =>
         {
-            // Remove existing DbContext to replace with test configuration
-            var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<SupplierDbContext>));
-            if (descriptor != null) services.Remove(descriptor);
+            // Clear all DbContext registrations
+            var dbContextDescriptors = services.Where(d => d.ServiceType.IsAssignableFrom(typeof(SupplierDbContext))).ToList();
+            foreach (var descriptor in dbContextDescriptors)
+            {
+                services.Remove(descriptor);
+            }
 
+            // Add test-specific DbContext
             services.AddDbContext<SupplierDbContext>(options =>
             {
                 options.UseNpgsql(ConnectionString);
             });
 
-            // Ensure database is created (no migrations exist)
+            // Also register ISupplierDbContext
+            services.AddScoped<ISupplierDbContext>(sp => sp.GetRequiredService<SupplierDbContext>());
+
+            // Ensure database is created (once per factory, not per test)
             using var scope = services.BuildServiceProvider().CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<SupplierDbContext>();
             context.Database.EnsureCreated();
@@ -120,6 +156,8 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
         });
     }
 
+    private static readonly Dictionary<string, string[]> _testPermissions = new();
+
     public HttpClient CreateAuthenticatedClient()
     {
         var client = CreateClient();
@@ -129,9 +167,34 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
 
     public HttpClient CreatePermissionAuthenticatedClient(string userId = "test-user", string[]? permissions = null)
     {
+        var key = Guid.NewGuid().ToString();
+        _testPermissions[key] = permissions ?? [];
+
         var client = CreateClient();
-        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TestAuthHandler.AuthenticationScheme);
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TestAuthHandler.AuthenticationScheme, key);
         return client;
+    }
+
+    public static string[] GetPermissions(string authKey)
+    {
+        if (string.IsNullOrEmpty(authKey) || !_testPermissions.TryGetValue(authKey, out var permissions))
+        {
+            // Default to all permissions if no key provided
+            return
+            [
+                "supplier.suppliers.read",
+                "supplier.suppliers.create",
+                "supplier.suppliers.update",
+                "supplier.suppliers.delete",
+                "supplier.suppliers.approve",
+                "supplier.contacts.read",
+                "supplier.contacts.create",
+                "supplier.certifications.manage",
+                "supplier.performance.rate",
+                "supplier.performance.view"
+            ];
+        }
+        return permissions;
     }
 }
 

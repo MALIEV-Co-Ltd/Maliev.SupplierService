@@ -1,8 +1,11 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Maliev.SupplierService.Domain.Entities;
 using Maliev.SupplierService.Domain.Enums;
 using Maliev.SupplierService.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -12,7 +15,11 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
 {
     protected readonly IntegrationTestWebAppFactory Factory;
     protected readonly HttpClient Client;
-    protected readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+    protected readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     protected BaseIntegrationTest(IntegrationTestWebAppFactory factory)
     {
@@ -20,14 +27,48 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
         Client = factory.CreateAuthenticatedClient();
     }
 
-    public async Task InitializeAsync()
+    public Task InitializeAsync()
     {
-        await Factory.InitializeAsync();
+        return Task.CompletedTask;
     }
 
-    public async Task DisposeAsync()
+    public Task DisposeAsync()
     {
-        await Factory.DisposeAsync();
+        Client.Dispose();
+        return Task.CompletedTask;
+    }
+
+    // Phase 3: Transaction support for test isolation
+    protected async Task RunInTransactionAsync(Func<Task> testAction)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<SupplierDbContext>();
+
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        try
+        {
+            await testAction();
+        }
+        finally
+        {
+            await transaction.RollbackAsync();
+        }
+    }
+
+    protected async Task<T> RunInTransactionAsync<T>(Func<Task<T>> testAction)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<SupplierDbContext>();
+
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        try
+        {
+            return await testAction();
+        }
+        finally
+        {
+            await transaction.RollbackAsync();
+        }
     }
 
     protected async Task<T?> GetResponseAsync<T>(HttpResponseMessage response)
@@ -36,7 +77,7 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
         return JsonSerializer.Deserialize<T>(content, JsonOptions);
     }
 
-    protected async Task<Supplier> CreateTestSupplierAsync(
+    protected async Task<(Supplier Supplier, uint Xmin)> CreateTestSupplierAsync(
         string name = "Test Supplier",
         string taxId = null!)
     {
@@ -61,7 +102,13 @@ public abstract class BaseIntegrationTest : IAsyncLifetime
         context.Suppliers.Add(supplier);
         await context.SaveChangesAsync();
 
-        return supplier;
+        // Reload to get the xmin value from the database
+        await context.Entry(supplier).ReloadAsync();
+
+        // Get the xmin value from the shadow property
+        var xminValue = context.Entry(supplier).Property<uint>("xmin").CurrentValue;
+
+        return (supplier, xminValue);
     }
 
     protected async Task<MaterialCategory> CreateTestCategoryAsync(string name = "Test Category")

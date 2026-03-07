@@ -23,10 +23,11 @@ public class SupplierDbContext : DbContext, ISupplierDbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // Configure RowVersion for optimistic concurrency
+        // Configure xmin for optimistic concurrency (PostgreSQL system column)
         modelBuilder.Entity<Supplier>()
-            .Property(s => s.RowVersion)
-            .HasColumnName("RowVersion")
+            .Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
             .IsConcurrencyToken();
 
         // Configure relationships

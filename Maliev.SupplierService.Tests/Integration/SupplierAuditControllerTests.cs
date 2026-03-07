@@ -20,7 +20,7 @@ public class SupplierAuditControllerTests : BaseIntegrationTest
     public async Task GetAuditTrail_ReturnsAuditLogs()
     {
         // Arrange
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, _) = await CreateTestSupplierAsync();
 
         using (var scope = Factory.Services.CreateScope())
         {

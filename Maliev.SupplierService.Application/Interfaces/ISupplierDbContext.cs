@@ -16,5 +16,6 @@ public interface ISupplierDbContext
     DbSet<SupplierAuditLog> SupplierAuditLogs { get; }
 
     EntityEntry Entry(object entity);
+    EntityEntry<TEntity> Entry<TEntity>(TEntity entity) where TEntity : class;
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

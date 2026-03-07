@@ -64,7 +64,7 @@ public class SuppliersControllerTests : BaseIntegrationTest
     public async Task GetSupplier_ExistingId_Returns200()
     {
         // Arrange
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, _) = await CreateTestSupplierAsync();
 
         // Act
         var response = await Client.GetAsync($"/supplier/v1/suppliers/{supplier.Id}");
@@ -80,7 +80,7 @@ public class SuppliersControllerTests : BaseIntegrationTest
     public async Task UpdateSupplier_ValidData_Returns200()
     {
         // Arrange
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, xmin) = await CreateTestSupplierAsync();
         var request = new UpdateSupplierRequest(
             CompanyName: "Updated Name",
             Address: "Updated Address",
@@ -89,7 +89,7 @@ public class SuppliersControllerTests : BaseIntegrationTest
             PostalCode: null,
             MaterialCategoryIds: null,
             Capabilities: null,
-            RowVersion: Convert.ToBase64String(supplier.RowVersion)
+            RowVersion: xmin.ToString()
         );
 
         // Act

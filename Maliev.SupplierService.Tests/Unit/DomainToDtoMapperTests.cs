@@ -20,16 +20,15 @@ public class DomainToDtoMapperTests
             Status = SupplierStatus.Active,
             OnboardingStage = OnboardingStage.Active,
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-            RowVersion = new byte[] { 1, 2, 3, 4 }
+            UpdatedAt = DateTime.UtcNow
         };
 
         // Act
-        var result = supplier.ToSupplierResponse();
+        var result = supplier.ToSupplierResponse(12345u);
 
         // Assert
         Assert.Equal(supplier.Id, result.Id);
         Assert.Equal(supplier.CompanyName, result.CompanyName);
-        Assert.Equal(Convert.ToBase64String(supplier.RowVersion), result.RowVersion);
+        Assert.Equal("12345", result.RowVersion);
     }
 }

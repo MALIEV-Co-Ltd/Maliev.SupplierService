@@ -51,7 +51,7 @@ public class SupplierOnboardingController : ControllerBase
 
         try
         {
-            var supplier = await _supplierService.AdvanceOnboardingAsync(
+            var (supplier, xmin) = await _supplierService.AdvanceOnboardingAsync(
                 supplierId,
                 request.TargetStage,
                 request.Notes,
@@ -71,7 +71,7 @@ public class SupplierOnboardingController : ControllerBase
                 supplier.OnboardingStage,
                 supplier.CreatedAt,
                 supplier.UpdatedAt,
-                Convert.ToBase64String(supplier.RowVersion)));
+                xmin.ToString()));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
         {
@@ -93,7 +93,7 @@ public class SupplierOnboardingController : ControllerBase
         Guid supplierId,
         CancellationToken cancellationToken)
     {
-        var supplier = await _supplierService.GetByIdAsync(supplierId, cancellationToken);
+        var (supplier, _) = await _supplierService.GetByIdAsync(supplierId, cancellationToken);
         if (supplier is null)
         {
             return NotFound(new { message = $"Supplier with ID {supplierId} not found" });

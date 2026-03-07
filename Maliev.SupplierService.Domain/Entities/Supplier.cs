@@ -17,7 +17,6 @@ public class Supplier
     public DateTime UpdatedAt { get; set; }
     public string? CreatedBy { get; set; }
     public string? UpdatedBy { get; set; }
-    public byte[] RowVersion { get; set; } = [];
     public DateTime? LastOrderDate { get; set; }
     public decimal? TotalOrderValue { get; set; }
 

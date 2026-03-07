@@ -19,7 +19,7 @@ public class SupplierContactsControllerTests : BaseIntegrationTest
     public async Task AddContact_WithValidData_Returns201()
     {
         // Arrange
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, _) = await CreateTestSupplierAsync();
         var request = new CreateContactRequest(
             Name: "Jane Smith",
             Email: "jane@example.com",
@@ -41,7 +41,7 @@ public class SupplierContactsControllerTests : BaseIntegrationTest
     public async Task GetContacts_ReturnsList()
     {
         // Arrange
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, _) = await CreateTestSupplierAsync();
         var request = new CreateContactRequest(
             Name: "Jane Smith",
             Email: "jane@example.com",

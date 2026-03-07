@@ -46,7 +46,7 @@ public class SupplierService : ISupplierService
     }
 
     /// <inheritdoc/>
-    public async Task<Supplier> CreateAsync(
+    public async Task<(Supplier Supplier, uint Xmin)> CreateAsync(
         string companyName,
         string taxId,
         string address,
@@ -178,7 +178,8 @@ public class SupplierService : ISupplierService
             )
         ), cancellationToken);
 
-        return supplier;
+        var xmin = GetXmin(supplier);
+        return (supplier, xmin);
     }
 
     /// <inheritdoc/>
@@ -239,13 +240,16 @@ public class SupplierService : ISupplierService
     }
 
     /// <inheritdoc/>
-    public async Task<Supplier?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<(Supplier? Supplier, uint Xmin)> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var cacheKey = $"supplier:{id}";
+        var xminCacheKey = $"supplier:{id}:xmin";
+
         var cached = await _cacheService.GetAsync<Supplier>(cacheKey, cancellationToken);
         if (cached is not null)
         {
-            return cached;
+            var cachedXmin = await _cacheService.GetAsync<uint>(xminCacheKey, cancellationToken);
+            return (cached, cachedXmin);
         }
 
         var supplier = await _context.Suppliers
@@ -259,10 +263,13 @@ public class SupplierService : ISupplierService
 
         if (supplier is not null)
         {
+            var xmin = GetXmin(supplier);
             await _cacheService.SetAsync(cacheKey, supplier, TimeSpan.FromMinutes(15), cancellationToken);
+            await _cacheService.SetAsync(xminCacheKey, xmin, TimeSpan.FromMinutes(15), cancellationToken);
+            return (supplier, xmin);
         }
 
-        return supplier;
+        return (null, 0u);
     }
 
     /// <inheritdoc/>
@@ -335,7 +342,7 @@ public class SupplierService : ISupplierService
     }
 
     /// <inheritdoc/>
-    public async Task<Supplier> UpdateAsync(
+    public async Task<(Supplier Supplier, uint Xmin)> UpdateAsync(
         Guid id,
         string? companyName,
         string? address,
@@ -344,7 +351,7 @@ public class SupplierService : ISupplierService
         string? postalCode,
         IEnumerable<Guid>? materialCategoryIds,
         IEnumerable<string>? capabilities,
-        byte[] rowVersion,
+        uint rowVersion,
         string userId,
         string userName,
         CancellationToken cancellationToken = default)
@@ -359,7 +366,7 @@ public class SupplierService : ISupplierService
             throw new InvalidOperationException("Supplier not found.");
         }
 
-        _context.Entry(supplier).Property("RowVersion").OriginalValue = rowVersion;
+        _context.Entry<Supplier>(supplier).Property<uint>("xmin").OriginalValue = rowVersion;
 
         var oldSupplier = new
         {
@@ -492,15 +499,16 @@ public class SupplierService : ISupplierService
             )
         ), cancellationToken);
 
-        return supplier;
+        var xmin = GetXmin(supplier);
+        return (supplier, xmin);
     }
 
     /// <inheritdoc/>
-    public async Task<Supplier> UpdateStatusAsync(
+    public async Task<(Supplier Supplier, uint Xmin)> UpdateStatusAsync(
         Guid id,
         SupplierStatus newStatus,
         string? reason,
-        byte[] rowVersion,
+        uint rowVersion,
         string userId,
         string userName,
         CancellationToken cancellationToken = default)
@@ -513,7 +521,7 @@ public class SupplierService : ISupplierService
             throw new InvalidOperationException("Supplier not found.");
         }
 
-        _context.Entry(supplier).Property("RowVersion").OriginalValue = rowVersion;
+        _context.Entry<Supplier>(supplier).Property<uint>("xmin").OriginalValue = rowVersion;
 
         var oldStatus = supplier.Status;
         supplier.Status = newStatus;
@@ -554,7 +562,8 @@ public class SupplierService : ISupplierService
             )
         ), cancellationToken);
 
-        return supplier;
+        var xmin = GetXmin(supplier);
+        return (supplier, xmin);
     }
 
     /// <inheritdoc/>
@@ -837,7 +846,7 @@ public class SupplierService : ISupplierService
     }
 
     /// <inheritdoc/>
-    public async Task<Supplier> AdvanceOnboardingAsync(
+    public async Task<(Supplier Supplier, uint Xmin)> AdvanceOnboardingAsync(
         Guid supplierId,
         OnboardingStage targetStage,
         string? notes,
@@ -904,7 +913,8 @@ public class SupplierService : ISupplierService
         await _context.SaveChangesAsync(cancellationToken);
         await _cacheService.RemoveAsync($"supplier:{supplierId}", cancellationToken);
 
-        return supplier;
+        var xmin = GetXmin(supplier);
+        return (supplier, xmin);
     }
 
     /// <inheritdoc/>
@@ -1005,5 +1015,11 @@ public class SupplierService : ISupplierService
 
         await _cacheService.RemoveAsync($"supplier:{id}", cancellationToken);
         await _cacheService.RemoveByPatternAsync("supplier:list:*", cancellationToken);
+    }
+
+    /// <summary>Reads the xmin shadow property from the EF change tracker and returns its current value.</summary>
+    private uint GetXmin(Supplier supplier)
+    {
+        return _context.Entry<Supplier>(supplier).Property<uint>("xmin").CurrentValue;
     }
 }

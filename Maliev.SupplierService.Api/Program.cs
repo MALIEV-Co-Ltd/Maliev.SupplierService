@@ -40,14 +40,22 @@ try
 
     builder.AddStandardCache("supplier:"); // Redis + in-memory fallback, memory-optimized
 
-    builder.AddMassTransitWithRabbitMq(cfg =>
+    // Configure MassTransit - skip outbox in Testing environment
+    if (!builder.Environment.IsEnvironment("Testing"))
     {
-        cfg.AddEntityFrameworkOutbox<SupplierDbContext>(o =>
+        builder.AddMassTransitWithRabbitMq(cfg =>
         {
-            o.UsePostgres();
-            o.UseBusOutbox();
+            cfg.AddEntityFrameworkOutbox<SupplierDbContext>(o =>
+            {
+                o.UsePostgres();
+                o.UseBusOutbox();
+            });
         });
-    }); // RabbitMQ message bus (non-blocking startup)
+    }
+    else
+    {
+        builder.AddMassTransitWithRabbitMq();
+    } // RabbitMQ message bus (non-blocking startup)
 
     // --- API Configuration ---
     builder.AddStandardCors(); // CORS with fail-fast validation
@@ -91,7 +99,10 @@ try
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
     // --- Database Migrations ---
-    await app.MigrateDatabaseAsync<SupplierDbContext>();
+    if (!app.Environment.IsEnvironment("Testing"))
+    {
+        await app.MigrateDatabaseAsync<SupplierDbContext>();
+    }
 
     // Use custom middleware
     app.UseStandardMiddleware();

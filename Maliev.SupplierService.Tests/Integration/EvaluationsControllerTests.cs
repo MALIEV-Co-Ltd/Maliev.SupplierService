@@ -20,7 +20,7 @@ public class EvaluationsControllerTests : BaseIntegrationTest
     public async Task AddEvaluation_WithValidData_Returns201()
     {
         // Arrange
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, _) = await CreateTestSupplierAsync();
         var request = new CreateEvaluationRequest(
             Category: PerformanceRatingCategory.Quality,
             Score: 5,
@@ -43,7 +43,7 @@ public class EvaluationsControllerTests : BaseIntegrationTest
     public async Task GetEvaluations_ReturnsList()
     {
         // Arrange
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, _) = await CreateTestSupplierAsync();
         var request = new CreateEvaluationRequest(
             Category: PerformanceRatingCategory.Delivery,
             Score: 4,

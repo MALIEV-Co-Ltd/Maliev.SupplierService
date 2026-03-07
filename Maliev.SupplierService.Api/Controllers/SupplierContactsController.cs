@@ -104,7 +104,7 @@ public class SupplierContactsController : ControllerBase
         Guid supplierId,
         CancellationToken cancellationToken)
     {
-        var supplier = await _supplierService.GetByIdAsync(supplierId, cancellationToken);
+        var (supplier, _) = await _supplierService.GetByIdAsync(supplierId, cancellationToken);
         if (supplier is null)
         {
             return NotFound(new { message = $"Supplier with ID {supplierId} not found" });

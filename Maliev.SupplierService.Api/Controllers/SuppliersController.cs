@@ -51,7 +51,7 @@ public class SuppliersController : ControllerBase
         var userId = User.FindFirst("sub")?.Value ?? "anonymous";
         var userName = User.FindFirst("name")?.Value ?? "Anonymous User";
 
-        var supplier = await _supplierService.CreateAsync(
+        var (supplier, xmin) = await _supplierService.CreateAsync(
             request.CompanyName,
             request.TaxId,
             request.Address,
@@ -65,7 +65,7 @@ public class SuppliersController : ControllerBase
             userName,
             cancellationToken);
 
-        var response = supplier.ToSupplierResponse();
+        var response = supplier.ToSupplierResponse(xmin);
 
         _logger.LogInformation("Created supplier {SupplierId}", supplier.Id);
 
@@ -95,7 +95,7 @@ public class SuppliersController : ControllerBase
         var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
 
         var response = new SupplierListResponse(
-            items.Select(s => s.ToSupplierResponse()).ToList(),
+            items.Select(s => s.ToSupplierResponse(0u)).ToList(),
             totalCount,
             page,
             pageSize,
@@ -115,14 +115,14 @@ public class SuppliersController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        var supplier = await _supplierService.GetByIdAsync(id, cancellationToken);
+        var (supplier, xmin) = await _supplierService.GetByIdAsync(id, cancellationToken);
 
         if (supplier is null)
         {
             return NotFound(new { message = $"Supplier with ID {id} not found" });
         }
 
-        var response = supplier.ToSupplierDetailResponse();
+        var response = supplier.ToSupplierDetailResponse(xmin);
         return Ok(response);
     }
 
@@ -217,14 +217,14 @@ public class SuppliersController : ControllerBase
         var userId = User.FindFirst("sub")?.Value ?? "anonymous";
         var userName = User.FindFirst("name")?.Value ?? "Anonymous User";
 
-        if (!DecodeRowVersion(request.RowVersion, out var rowVersion, out var errorResponse))
+        if (!ParseRowVersion(request.RowVersion, out var rowVersion, out var errorResponse))
         {
             return errorResponse!;
         }
 
         try
         {
-            var supplier = await _supplierService.UpdateAsync(
+            var (supplier, xmin) = await _supplierService.UpdateAsync(
                 id,
                 request.CompanyName,
                 request.Address,
@@ -238,7 +238,7 @@ public class SuppliersController : ControllerBase
                 userName,
                 cancellationToken);
 
-            return Ok(supplier.ToSupplierResponse());
+            return Ok(supplier.ToSupplierResponse(xmin));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
         {
@@ -272,14 +272,14 @@ public class SuppliersController : ControllerBase
         var userId = User.FindFirst("sub")?.Value ?? "anonymous";
         var userName = User.FindFirst("name")?.Value ?? "Anonymous User";
 
-        if (!DecodeRowVersion(request.RowVersion, out var rowVersion, out var errorResponse))
+        if (!ParseRowVersion(request.RowVersion, out var rowVersion, out var errorResponse))
         {
             return errorResponse!;
         }
 
         try
         {
-            var supplier = await _supplierService.UpdateStatusAsync(
+            var (supplier, xmin) = await _supplierService.UpdateStatusAsync(
                 id,
                 request.Status,
                 request.Reason,
@@ -288,7 +288,7 @@ public class SuppliersController : ControllerBase
                 userName,
                 cancellationToken);
 
-            return Ok(supplier.ToSupplierResponse());
+            return Ok(supplier.ToSupplierResponse(xmin));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
         {
@@ -362,19 +362,15 @@ public class SuppliersController : ControllerBase
         }
     }
 
-    private bool DecodeRowVersion(string rowVersionStr, out byte[] rowVersion, out BadRequestObjectResult? errorResponse)
+    private bool ParseRowVersion(string rowVersionStr, out uint rowVersion, out BadRequestObjectResult? errorResponse)
     {
-        try
+        if (uint.TryParse(rowVersionStr, out rowVersion))
         {
-            rowVersion = Convert.FromBase64String(rowVersionStr);
             errorResponse = null;
             return true;
         }
-        catch (FormatException)
-        {
-            rowVersion = Array.Empty<byte>();
-            errorResponse = BadRequest(new { message = $"Invalid RowVersion format. Must be a Base64 string. Received: '{rowVersionStr}'" });
-            return false;
-        }
+        rowVersion = 0;
+        errorResponse = BadRequest(new { message = $"Invalid RowVersion format. Must be a uint string. Received: '{rowVersionStr}'" });
+        return false;
     }
 }

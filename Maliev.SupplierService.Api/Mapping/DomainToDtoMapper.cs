@@ -12,7 +12,7 @@ public static class DomainToDtoMapper
     /// <summary>
     /// Maps a Supplier entity to SupplierResponse DTO
     /// </summary>
-    public static SupplierResponse ToSupplierResponse(this Supplier supplier)
+    public static SupplierResponse ToSupplierResponse(this Supplier supplier, uint xmin)
     {
         return new SupplierResponse(
             supplier.Id,
@@ -26,13 +26,13 @@ public static class DomainToDtoMapper
             supplier.OnboardingStage,
             supplier.CreatedAt,
             supplier.UpdatedAt,
-            Convert.ToBase64String(supplier.RowVersion));
+            xmin.ToString());
     }
 
     /// <summary>
     /// Maps a Supplier entity to SupplierDetailResponse DTO with related collections
     /// </summary>
-    public static SupplierDetailResponse ToSupplierDetailResponse(this Supplier supplier)
+    public static SupplierDetailResponse ToSupplierDetailResponse(this Supplier supplier, uint xmin)
     {
         return new SupplierDetailResponse(
             supplier.Id,
@@ -46,7 +46,7 @@ public static class DomainToDtoMapper
             supplier.OnboardingStage,
             supplier.CreatedAt,
             supplier.UpdatedAt,
-            Convert.ToBase64String(supplier.RowVersion),
+            xmin.ToString(),
             supplier.Contacts.Select(c => new ContactResponse(
                 c.Id, c.Name, c.Role, c.Email, c.Phone, c.IsPrimary, c.CreatedAt)).ToList(),
             supplier.MaterialCategories.Select(m => new MaterialCategoryResponse(

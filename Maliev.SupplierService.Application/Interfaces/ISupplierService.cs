@@ -6,7 +6,7 @@ namespace Maliev.SupplierService.Application.Interfaces;
 
 public interface ISupplierService
 {
-    Task<Supplier> CreateAsync(
+    Task<(Supplier Supplier, uint Xmin)> CreateAsync(
         string companyName,
         string taxId,
         string address,
@@ -27,7 +27,7 @@ public interface ISupplierService
         string userName,
         CancellationToken cancellationToken = default);
 
-    Task<Supplier?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<(Supplier? Supplier, uint Xmin)> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<(bool IsValid, Supplier? Supplier)> ValidateSupplierAsync(Guid id, CancellationToken cancellationToken = default);
 
@@ -35,7 +35,7 @@ public interface ISupplierService
 
     Task<IReadOnlyList<MaterialCategory>> GetMaterialCategoriesAsync(CancellationToken cancellationToken = default);
 
-    Task<Supplier> UpdateAsync(
+    Task<(Supplier Supplier, uint Xmin)> UpdateAsync(
         Guid id,
         string? companyName,
         string? address,
@@ -44,16 +44,16 @@ public interface ISupplierService
         string? postalCode,
         IEnumerable<Guid>? materialCategoryIds,
         IEnumerable<string>? capabilities,
-        byte[] rowVersion,
+        uint rowVersion,
         string userId,
         string userName,
         CancellationToken cancellationToken = default);
 
-    Task<Supplier> UpdateStatusAsync(
+    Task<(Supplier Supplier, uint Xmin)> UpdateStatusAsync(
         Guid id,
         SupplierStatus newStatus,
         string? reason,
-        byte[] rowVersion,
+        uint rowVersion,
         string userId,
         string userName,
         CancellationToken cancellationToken = default);
@@ -114,7 +114,7 @@ public interface ISupplierService
         Guid supplierId,
         CancellationToken cancellationToken = default);
 
-    Task<Supplier> AdvanceOnboardingAsync(
+    Task<(Supplier Supplier, uint Xmin)> AdvanceOnboardingAsync(
         Guid supplierId,
         OnboardingStage targetStage,
         string? notes,

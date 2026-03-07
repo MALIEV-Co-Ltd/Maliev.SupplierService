@@ -21,7 +21,7 @@ public class DependencyTests : BaseIntegrationTest
     public async Task DeleteSupplier_WithInvoices_Returns400Conflict()
     {
         // Arrange
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, _) = await CreateTestSupplierAsync();
 
         // Mock InvoiceService to return references
         var invoiceClient = Factory.Services.GetRequiredService<IInvoiceServiceClient>();
@@ -41,7 +41,7 @@ public class DependencyTests : BaseIntegrationTest
     public async Task DeleteSupplier_WithPurchaseOrders_Returns400Conflict()
     {
         // Arrange
-        var supplier = await CreateTestSupplierAsync();
+        var (supplier, _) = await CreateTestSupplierAsync();
 
         // Mock PurchaseOrderService to return references
         var poClient = Factory.Services.GetRequiredService<IPurchaseOrderServiceClient>();
