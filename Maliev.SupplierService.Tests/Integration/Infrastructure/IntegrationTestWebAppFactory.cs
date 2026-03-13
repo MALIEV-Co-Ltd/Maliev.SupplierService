@@ -35,8 +35,9 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
     public IntegrationTestWebAppFactory()
     {
         // Phase 2: Optimized container configuration
-        _postgresContainer = new PostgreSqlBuilder()
-            .WithImage("postgres:18-alpine")
+        _postgresContainer =
+#pragma warning disable CS0618
+        new PostgreSqlBuilder().WithImage("postgres:18-alpine")
             .WithDatabase("supplier_test")
             .Build();
 
@@ -113,6 +114,7 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
                 ["Jwt:SecurityKey"] = "test-secret-key-for-integration-tests-minimum-32-chars"
             })
             .Build();
+#pragma warning restore CS0618
 
         builder.UseConfiguration(config);
 
