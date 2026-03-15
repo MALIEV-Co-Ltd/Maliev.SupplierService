@@ -1,5 +1,6 @@
 using Maliev.SupplierService.Application.Interfaces;
 using Maliev.SupplierService.Domain.Entities;
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
 namespace Maliev.SupplierService.Infrastructure.Persistence;
@@ -22,6 +23,10 @@ public class SupplierDbContext : DbContext, ISupplierDbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddOutboxStateEntity();
 
         // Configure xmin for optimistic concurrency (PostgreSQL system column)
         modelBuilder.Entity<Supplier>()
