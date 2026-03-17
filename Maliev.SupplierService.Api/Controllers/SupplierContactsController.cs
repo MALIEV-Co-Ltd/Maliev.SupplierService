@@ -13,7 +13,7 @@ namespace Maliev.SupplierService.Api.Controllers;
 /// Controller for managing supplier contacts.
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("supplier/v{version:apiVersion}/suppliers/{supplierId:guid}/contacts")]
 public class SupplierContactsController : ControllerBase
 {

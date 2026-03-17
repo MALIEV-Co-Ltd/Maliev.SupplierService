@@ -12,7 +12,7 @@ namespace Maliev.SupplierService.Api.Controllers;
 /// Controller for retrieving supplier audit trail information.
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("supplier/v{version:apiVersion}/suppliers/{supplierId:guid}/audit")]
 public class SupplierAuditController : ControllerBase
 {

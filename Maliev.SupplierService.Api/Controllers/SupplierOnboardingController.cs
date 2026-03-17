@@ -13,7 +13,7 @@ namespace Maliev.SupplierService.Api.Controllers;
 /// Controller for managing the supplier onboarding process.
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("supplier/v{version:apiVersion}/suppliers/{supplierId:guid}/onboarding")]
 public class SupplierOnboardingController : ControllerBase
 {

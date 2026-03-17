@@ -13,7 +13,7 @@ namespace Maliev.SupplierService.Api.Controllers;
 /// Controller for managing supplier certifications.
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("supplier/v{version:apiVersion}/suppliers/{supplierId:guid}/certifications")]
 public class SupplierCertificationsController : ControllerBase
 {
@@ -131,7 +131,7 @@ public class SupplierCertificationsController : ControllerBase
 /// Controller for handling certifications across all suppliers.
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("supplier/v{version:apiVersion}/certifications")]
 public class CertificationsController : ControllerBase
 {

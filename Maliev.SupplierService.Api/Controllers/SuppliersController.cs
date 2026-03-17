@@ -16,7 +16,7 @@ namespace Maliev.SupplierService.Api.Controllers;
 /// Main controller for managing supplier information.
 /// </summary>
 [ApiController]
-[ApiVersion("1.0")]
+[ApiVersion("1")]
 [Route("supplier/v{version:apiVersion}/suppliers")]
 public class SuppliersController : ControllerBase
 {
