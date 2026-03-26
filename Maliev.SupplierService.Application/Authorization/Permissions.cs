@@ -1,4 +1,4 @@
-namespace Maliev.SupplierService.Api.Constants;
+namespace Maliev.SupplierService.Application.Authorization;
 
 /// <summary>
 /// Defines granular permission identifiers for the SupplierService.

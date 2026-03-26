@@ -1,5 +1,5 @@
 using Maliev.Aspire.ServiceDefaults.IAM;
-using Maliev.SupplierService.Api.Constants;
+using Maliev.SupplierService.Application.Authorization;
 
 namespace Maliev.SupplierService.Api.Services;
 

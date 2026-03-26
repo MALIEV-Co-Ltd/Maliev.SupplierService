@@ -1,4 +1,4 @@
-namespace Maliev.SupplierService.Api.Constants;
+namespace Maliev.SupplierService.Application.Authorization;
 
 /// <summary>
 /// Predefined roles for the Supplier Service.

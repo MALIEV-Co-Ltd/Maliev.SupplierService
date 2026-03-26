@@ -1,6 +1,6 @@
 using Asp.Versioning;
 using Maliev.Aspire.ServiceDefaults.Authorization;
-using Maliev.SupplierService.Api.Constants;
+using Maliev.SupplierService.Application.Authorization;
 using Maliev.SupplierService.Api.DTOs.Responses;
 using Maliev.SupplierService.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;

@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using Maliev.SupplierService.Api.Constants;
+using Maliev.SupplierService.Application.Authorization;
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Application.DTOs.Requests;
 using Maliev.SupplierService.Domain.Enums;
