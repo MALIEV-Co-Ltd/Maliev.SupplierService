@@ -17,7 +17,7 @@ public class ServiceRegistrationTests
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Database=test",
+                ["ConnectionStrings:DefaultConnection"] = "Server=placeholder;Database=placeholder",
                 ["ExternalServices:PurchaseOrderService"] = "http://po",
                 ["ExternalServices:InvoiceService"] = "http://invoice",
                 ["ExternalServices:MaterialService"] = "http://material"
