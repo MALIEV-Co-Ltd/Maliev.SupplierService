@@ -66,12 +66,13 @@ public class SuppliersController : ControllerBase
             cancellationToken);
 
         var response = supplier.ToSupplierResponse(xmin);
+        var apiVersion = HttpContext.GetRequestedApiVersion()?.ToString() ?? "1.0";
 
         _logger.LogInformation("Created supplier {SupplierId}", supplier.Id);
 
         return CreatedAtAction(
             nameof(GetSupplier),
-            new { id = supplier.Id, version = "1" },
+            new { id = supplier.Id, version = apiVersion },
             response);
     }
 
