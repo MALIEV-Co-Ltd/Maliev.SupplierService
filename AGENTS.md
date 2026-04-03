@@ -3,88 +3,106 @@
 This document provides instructions for AI agents operating within the `Maliev.SupplierService` repository.
 Follow these guidelines to maintain code quality, consistency, and stability.
 
-## 1. Build, Lint, and Test Commands
+## 1. Build, Test & Lint Commands
 
-Always verify changes by running builds and tests.
+All commands run from within this service directory (`B:\maliev\Maliev.SupplierService`).
 
-### Build
-- **Build Solution:** `dotnet build`
-- **Build Specific Project:** `dotnet build Maliev.SupplierService.Api/Maliev.SupplierService.Api.csproj`
+```powershell
+# Build (treats warnings as errors — all must be fixed)
+dotnet build Maliev.SupplierService.slnx
 
-### Test
-- **Run All Tests:** `dotnet test`
-- **Run Unit Tests Only:** `dotnet test Maliev.SupplierService.Tests --filter "Category=Unit"` (assuming category usage, otherwise path based)
-- **Run Integration Tests Only:** `dotnet test Maliev.SupplierService.Tests --filter "Category=Integration"`
-- **Run a Single Test:**
-  ```bash
-  dotnet test --filter "FullyQualifiedName~Maliev.SupplierService.Tests.Integration.SuppliersControllerTests.CreateSupplier_WithValidData_Returns201AndSupplier"
-  ```
-  *Note: Replace the fully qualified name with the specific test method you want to run.*
+# Run all tests
+dotnet test Maliev.SupplierService.slnx --verbosity normal
 
-### Lint/Format
-- **Check Formatting:** `dotnet format --verify-no-changes`
-- **Fix Formatting:** `dotnet format`
+# Run a single test method
+dotnet test --filter "FullyQualifiedName~SuppliersControllerTests.CreateSupplier_WithValidData_Returns201AndSupplier"
 
-## 2. Code Style Guidelines
+# Run all tests in a class
+dotnet test --filter "FullyQualifiedName~SuppliersControllerTests"
 
-Adhere strictly to the existing style found in `Maliev.SupplierService.Api` and `Maliev.SupplierService.Data`.
+# Run with code coverage
+dotnet test Maliev.SupplierService.slnx --collect:"XPlat Code Coverage"
 
-### General Architecture
+# Format check
+dotnet format Maliev.SupplierService.slnx
+
+# EF Core migrations (Infrastructure project only)
+dotnet ef migrations add <Name> --project Maliev.SupplierService.Infrastructure --startup-project Maliev.SupplierService.Infrastructure
+```
+
+## 2. Code Style & Conventions
+
+### Architecture
+
 **Architecture**: Clean Architecture (Api, Application, Domain, Infrastructure, Tests)
 
-- **Api:** Controllers, DTOs, Middleware.
-- **Application:** Use cases, handlers, DTOs.
-- **Domain:** Entities, interfaces, value objects.
-- **Infrastructure:** EF Core, repositories.
-- **Tests:** Integration and Unit tests using xUnit.
-- **Dependency Injection:** Use constructor injection for all dependencies.
+- **Api:** Controllers, Consumers, Middleware.
+- **Application:** Use cases, handlers, DTOs, Interfaces.
+- **Domain:** Entities, value objects, domain interfaces.
+- **Infrastructure:** EF Core DbContext, repositories, HTTP clients.
+- **Tests:** Unit + Integration tests (xUnit).
+- **Dependency Injection:** Constructor injection with `private readonly` fields.
 - **Asynchrony:** Use `async/await` for all I/O-bound operations. Avoid `.Result` or `.Wait()`.
 
-### Imports & Namespaces
-- **File-Scoped Namespaces:** Use file-scoped namespaces (e.g., `namespace Maliev.SupplierService.Api.Controllers;`).
-- **Ordering:** System namespaces first, then third-party, then project namespaces.
-- **Cleanliness:** Remove unused `using` directives.
+### C# Naming & Formatting
 
-### Formatting
-- **Indentation:** Use 4 spaces. No tabs.
-- **Braces:** Allman style (opening braces on a new line).
-- **Line Length:** Aim for ~120 characters, but don't strictly enforce if it hurts readability.
-- **Properties:** Use auto-properties where possible (`public Guid Id { get; set; }`).
+- **Namespaces**: File-scoped (`namespace Maliev.SupplierService.Api.Controllers;`)
+- **Classes/Methods/Properties**: `PascalCase`
+- **Private fields**: `_camelCase` (underscore prefix)
+- **Parameters/locals**: `camelCase`
+- **Async methods**: Suffix with `Async` (e.g., `GetByIdAsync`)
+- **Interfaces**: Prefix with `I` (e.g., `ISupplierService`)
+- **Permissions**: GCP-style `{domain}.{plural-resource}.{action}` as `public const string` in a `Permissions` static class
+  - Valid: `supplier.suppliers.create`, `supplier.eligibility-rules.update`
+  - Invalid: `supplier.supplier.create` (singular), `eligibility.update` (missing resource)
+- **XML docs**: Required on ALL public methods and properties
+- **Nullable**: Enabled (`<Nullable>enable</Nullable>`). Use `?` explicitly
+- **Imports**: System first, then third-party, then local. Alphabetize within groups. Remove unused `using`
+- **Braces**: Allman style (new line) for methods and control structures. Expression-bodied for properties/accessors
+- **Indentation**: 4 spaces, LF line endings, UTF-8, trim trailing whitespace
 
-### Types & Features
-- **Nullable Reference Types:** Enabled. Use `string?` for nullable strings and `required string` for required properties in classes.
-- **Records:** Use `record` or `record struct` for DTOs and immutable data structures (e.g., `CreateSupplierRequest`).
-- **Pattern Matching:** Encourage use of pattern matching (`is`, `switch` expressions) where appropriate.
+### C# Patterns
 
-### Naming Conventions
-- **Classes/Methods/Properties:** PascalCase (e.g., `SupplierService`, `CreateAsync`, `CompanyName`).
-- **Variables/Parameters:** camelCase (e.g., `supplierId`, `cancellationToken`).
-- **Fields:** Private fields should be camelCase with underscore prefix (e.g., `_context`, `_logger`).
-- **Interfaces:** Prefix with 'I' (e.g., `ISupplierService`).
-- **Async Methods:** Suffix with 'Async' (e.g., `GetByIdAsync`).
-
-### Error Handling
-- **Exceptions:** Use exceptions for exceptional control flow.
-- **Controller Handling:** Controllers should catch specific exceptions (like `InvalidOperationException` for business rules) and map them to appropriate HTTP status codes (400, 404, 409).
-- **Validation:** Use Data Annotations (`[Required]`, `[MaxLength]`) on Entities and DTOs.
-- **Result Types:** Services typically return Entities or specific result tuples/objects, not `IActionResult`.
+- **DI**: Constructor injection with `private readonly` fields
+- **Controllers**: `[ApiController]`, `[ApiVersion("1")]`, `[Route("supplier/v{version:apiVersion}")]`
+- **Logging**: `ILogger<T>` with structured placeholders (never interpolate): `_logger.LogInformation("Processing {SupplierId}", supplierId)`
+- **Error handling**: Global exception middleware. Return `ProblemDetails` / `ErrorResponse` DTOs. Never expose stack traces
+- **JSON**: Check existing conventions in this service for naming policy
+- **Manual mapping**: Static extension methods (`ToDto()`, `ToEntity()`). AutoMapper is banned
+- **Validation**: `System.ComponentModel.DataAnnotations` on DTOs. FluentValidation is banned
 
 ### Database & Entities
-- **Table Names:** Snake_case using `[Table("table_name")]`.
-- **Column Names:** Snake_case using `[Column("column_name")]`.
-- **Primary Keys:** GUIDs are preferred for IDs.
-- **Configuration:** Use `IEntityTypeConfiguration<T>` in `Data/Configurations` rather than `OnModelCreating` bloat if possible, though Attributes are currently used in Entities. Follow the pattern in `Supplier.cs`.
+
+- **Table Names**: Snake_case using `[Table("table_name")]`.
+- **Column Names**: Snake_case using `[Column("column_name")]`.
+- **Primary Keys**: GUIDs are preferred for IDs.
+- **Configuration**: Use `IEntityTypeConfiguration<T>` in `Data/Configurations` rather than `OnModelCreating` bloat if possible, though Attributes are currently used in Entities. Follow the pattern in `Supplier.cs`.
 
 ### API Design
-- **Versioning:** Use `[ApiVersion("1.0")]` on controllers.
-- **Routing:** Kebab-case URLs (e.g., `supplier/v1/suppliers/{id}/eligibility`).
-- **Documentation:** Add XML comments (`/// <summary>`) to Controllers and public Service methods for OpenAPI generation.
 
-### Testing
-- **Framework:** xUnit.
-- **Naming:** `MethodName_StateUnderTesting_ExpectedBehavior`.
-- **Integration Tests:** Inherit from `BaseIntegrationTest`. Use `IntegrationTestWebAppFactory`.
-- **Assertions:** Use `Assert` class (e.g., `Assert.Equal`, `Assert.NotNull`).
+- **Versioning**: Use `[ApiVersion("1")]` on controllers.
+- **Routing**: Kebab-case URLs (e.g., `supplier/v1/suppliers/{id}/eligibility`).
+- **Documentation**: Add XML comments (`/// <summary>`) to Controllers and public Service methods for OpenAPI generation.
+
+## 3. Banned Libraries (Build Will Fail)
+
+| Banned | Use Instead |
+|--------|-------------|
+| AutoMapper | Manual mapping extensions |
+| FluentValidation | DataAnnotations or manual validation |
+| FluentAssertions | Standard xUnit `Assert.*` |
+| Swashbuckle/Swagger | Scalar (at `/supplier/scalar`) |
+| InMemoryDatabase (EF Core) | Testcontainers with real PostgreSQL |
+
+## 4. Testing Rules
+
+- **Framework**: xUnit with standard `Assert` (`Assert.Equal`, `Assert.NotNull`, etc.)
+- **Naming**: `MethodName_StateUnderTest_ExpectedBehavior` or `HTTP_METHOD_Path_Scenario_ExpectedStatus`
+- **Coverage**: Minimum 80% per service
+- **Integration tests**: `BaseIntegrationTestFactory<TProgram, TDbContext>` with Testcontainers (PostgreSQL, Redis, RabbitMQ). Never InMemoryDatabase
+- **System tests** (Tier 3): `AspireTestFixture` with `[Collection("AspireDomainTests")]` — shared AppHost, never one per class
+- **Eventual consistency**: Use `TestHelpers.WaitForAsync`. Never `Task.Delay`
+- **MassTransit consumers**: Must have consumer tests using `AddMassTransitTestHarness()`
 
 ### Testing Strategy (4-Tier Pyramid Context)
 
@@ -97,77 +115,47 @@ This service's tests cover **Tier 1 (Unit)** and **Tier 2 (Service Integration)*
 
 **Tier 3 (System Integration)** — cross-service workflows and event chains — is tested in `Maliev.Aspire.Tests/`.
 
-#### Key Rules
-- Use `BaseIntegrationTestFactory<TProgram, TDbContext>` for integration tests (real Testcontainers, never InMemoryDatabase)
-- Test naming: `MethodName_StateUnderTest_ExpectedBehavior`
-- Minimum 80% code coverage
-- Use `[Fact]` for single cases, `[Theory]` for parameterized tests
-
 > Full ecosystem test strategy: `Maliev.Aspire.Tests/TEST_PLAN.md`
 
-## 3. Constitution Rules (Mandatory)
+## 5. Mandatory Rules
 
-This service strictly adheres to the following platform development mandates:
+- **`TreatWarningsAsErrors = true`**: Zero warnings allowed. No suppression
+- **`[RequirePermission("supplier.resources.action")]`**: On all endpoints, not plain `[Authorize]`
+- **API versioning**: All routes versioned (`v1/`)
+- **Service prefix**: Routes prefixed with service domain (`/supplier`)
+- **Scalar docs**: Configured at `/supplier/scalar`
+- **Secrets**: Never hardcoded. Use GCP Secret Manager or environment variables
+- **Async/await**: All the way down. Pass `CancellationToken`
+- **EF Core Design package**: Only in Infrastructure project, never in Api
+- **PostgreSQL xmin**: Shadow property only — `entity.Property<uint>("xmin").HasColumnType("xid").IsRowVersion()`. Never add entity property
+- **Temporary files**: Generate in `/temp` folder, clean up afterwards
 
-### Banned Libraries
-To maintain high performance and low complexity, the following are **NOT** used:
-- ❌ **AutoMapper**: Explicit manual mapping only.
-- ❌ **FluentValidation**: Standard Data Annotations (`[Required]`, `[EmailAddress]`) only.
-- ❌ **FluentAssertions**: Standard xUnit `Assert` methods only.
-- ❌ **In-memory Test DB**: All integration tests use **Testcontainers** with real PostgreSQL 18.
+### EF Core Design Package
 
-### Mandatory Practices
-- ✅ **TreatWarningsAsErrors**: Enabled in all `.csproj` files.
-- ✅ **XML Documentation**: Required on all public methods and properties.
-- ✅ **No Secrets in Code**: All sensitive configuration injected via environment variables.
-- ✅ **No Test Config in Program.cs**: Test configuration in test fixtures only.
-- ✅ **EF Core Design Package**: `Microsoft.EntityFrameworkCore.Design` must ONLY be in the Infrastructure project where migrations are located. NEVER add it to the Api project.
-- ✅ **EF Migrations**: Create migrations using Infrastructure as both the project and startup project:
+- `Microsoft.EntityFrameworkCore.Design` MUST NOT be in Api projects
+- It belongs ONLY in the Infrastructure project where migrations live
+- Migration commands must target Infrastructure as both project and startup-project:
   ```bash
   dotnet ef migrations add <Name> --project Maliev.SupplierService.Infrastructure --startup-project Maliev.SupplierService.Infrastructure
   ```
 
-## 4. Workflow Rules
-
-1. **Safety First:** always check dependencies before modifying a file.
-2. **Incremental Changes:** Make small, verifiable changes.
-3. **Verification:** Run `dotnet build` after every significant code change.
-4. **No Assumptions:** Check `Program.cs` or `Startup.cs` (if it existed) to understand service registration.
-5. **Secrets:** Never commit secrets. Use `user-secrets` or environment variables.
-
----
-*Generated by Antigravity for Maliev.SupplierService*
-
-
-## Git & Version Control — Mandatory Rules
-
-### 🚨 CRITICAL: Always Commit Code Changes (Non-Negotiable)
-- **You MUST commit your changes to the local repository after completing any meaningful unit of work.**
-- **Never accumulate uncommitted changes.** Do not wait until end of session or until something breaks.
-- **Commit early and often** — if a change is meaningful (even a small fix or refactor), commit it.
-- **You do NOT need to push to remote** — local commits are sufficient to protect against accidental loss.
-- **If you are unsure whether to commit, commit anyway.** Extra commits are harmless; lost work is irreversible.
-- This rule applies even if you are just "testing" or "exploring" — use git branches to isolate experimental work and commit those changes too.
-
-### 🚨 CRITICAL: Never Use `git checkout` to Restore Broken Files
-- **NEVER use `git checkout` to restore or recover files.** This operation discards uncommitted changes permanently and will result in data loss.
-- **To undo/recover from broken files: first commit your current changes, then use `git revert` or `git reset --soft` to safely undo.**
-
-## Database & EF Core — Mandatory Rules
-
-### EF Core Design Package
-- ❌ `Microsoft.EntityFrameworkCore.Design` MUST NOT be in Api projects
-- ✅ It belongs ONLY in the Infrastructure (or Data) project where migrations live
-- Migration commands must target Infrastructure as both project and startup-project (since EF Core Design package is in Infrastructure):
-  ```
-  dotnet ef migrations add <Name> --project Maliev.<Domain>Service.Infrastructure --startup-project Maliev.<Domain>Service.Infrastructure
-  ```
-
 ### PostgreSQL xmin Concurrency — Mandatory Pattern
+
 Use shadow property ONLY. Never add a Xmin/xmin property to domain entities.
 ```csharp
 entity.Property<uint>("xmin").HasColumnType("xid").IsRowVersion();
 ```
-- ❌ Never use `UseXminAsConcurrencyToken()` (removed in Npgsql EF v7)
-- ❌ Never use entity property `public uint Xmin { get; set; }` or `public uint xmin { get; set; }`
-- ❌ Never use `.Ignore(e => e.Xmin)` — remove the entity property instead
+- Never use `UseXminAsConcurrencyToken()` (removed in Npgsql EF v7)
+- Never use entity property `public uint Xmin { get; set; }` or `public uint xmin { get; set; }`
+- Never use `.Ignore(e => e.Xmin)` — remove the entity property instead
+
+## 6. Git Rules
+
+- Each `Maliev.*` folder is an independent git repo. Work from within this service directory before git commands
+- **Commit early and often** after every meaningful unit of work. Do not accumulate changes
+- **Never use `git checkout` to restore files** — commit first, then `git revert` or `git reset --soft`
+- Feature branches merged to `develop` via PR. Do not push without being asked
+
+---
+
+*Generated by Antigravity for Maliev.SupplierService*
