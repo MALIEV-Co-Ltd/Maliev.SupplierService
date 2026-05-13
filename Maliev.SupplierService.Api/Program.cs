@@ -98,8 +98,14 @@ try
     var app = builder.Build();
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
-    // --- Database Migrations ---
-    if (!app.Environment.IsEnvironment("Testing"))
+    // --- Database Schema ---
+    if (app.Environment.IsEnvironment("Testing"))
+    {
+        using var scope = app.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<SupplierDbContext>();
+        await dbContext.Database.EnsureCreatedAsync();
+    }
+    else
     {
         await app.MigrateDatabaseAsync<SupplierDbContext>();
     }
