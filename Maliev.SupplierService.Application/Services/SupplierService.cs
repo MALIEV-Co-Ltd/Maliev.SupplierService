@@ -153,7 +153,7 @@ public class SupplierService : ISupplierService
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        await _cacheService.RemoveAsync($"supplier:{supplier.Id}", cancellationToken);
+        await InvalidateSupplierCacheAsync(supplier.Id, cancellationToken);
         await _cacheService.RemoveByPatternAsync("supplier:list:*", cancellationToken);
 
         await _publishEndpoint.Publish(new SupplierCreatedEvent(
@@ -178,7 +178,7 @@ public class SupplierService : ISupplierService
             )
         ), cancellationToken);
 
-        var xmin = GetXmin(supplier);
+        var xmin = await ReadFreshXminAsync(supplier, cancellationToken);
         return (supplier, xmin);
     }
 
@@ -234,7 +234,7 @@ public class SupplierService : ISupplierService
             userName);
 
         await _context.SaveChangesAsync(cancellationToken);
-        await _cacheService.RemoveAsync($"supplier:{supplierId}", cancellationToken);
+        await InvalidateSupplierCacheAsync(supplierId, cancellationToken);
 
         return contact;
     }
@@ -249,7 +249,12 @@ public class SupplierService : ISupplierService
         if (cached is not null)
         {
             var cachedXmin = await _cacheService.GetAsync<uint>(xminCacheKey, cancellationToken);
-            return (cached, cachedXmin);
+            if (cachedXmin != 0)
+            {
+                return (cached, cachedXmin);
+            }
+
+            await InvalidateSupplierCacheAsync(id, cancellationToken);
         }
 
         var supplier = await _context.Suppliers
@@ -263,7 +268,7 @@ public class SupplierService : ISupplierService
 
         if (supplier is not null)
         {
-            var xmin = GetXmin(supplier);
+            var xmin = await ReadFreshXminAsync(supplier, cancellationToken);
             await _cacheService.SetAsync(cacheKey, supplier, TimeSpan.FromMinutes(15), cancellationToken);
             await _cacheService.SetAsync(xminCacheKey, xmin, TimeSpan.FromMinutes(15), cancellationToken);
             return (supplier, xmin);
@@ -366,7 +371,14 @@ public class SupplierService : ISupplierService
             throw new InvalidOperationException("Supplier not found.");
         }
 
-        _context.Entry<Supplier>(supplier).Property<uint>("xmin").OriginalValue = rowVersion;
+        var xminProperty = _context.Entry<Supplier>(supplier).Property<uint>("xmin");
+        if (xminProperty.CurrentValue != rowVersion)
+        {
+            throw new DbUpdateConcurrencyException("The supplier has been modified by another user.");
+        }
+
+        xminProperty.OriginalValue = rowVersion;
+        xminProperty.CurrentValue = rowVersion;
 
         var oldSupplier = new
         {
@@ -380,6 +392,10 @@ public class SupplierService : ISupplierService
         };
 
         var changedFields = new List<string>();
+        List<MaterialCategory>? updatedCategories = null;
+        List<SupplierCapability>? capabilitiesToRemove = null;
+        List<string>? capabilityNamesToAdd = null;
+        List<string>? updatedCapabilityNames = null;
 
         if (companyName is not null && companyName != supplier.CompanyName)
         {
@@ -419,12 +435,13 @@ public class SupplierService : ISupplierService
                 throw new InvalidOperationException("One or more material category IDs are invalid or inactive.");
             }
 
-            supplier.MaterialCategories.Clear();
-            foreach (var category in categories)
+            var existingCategoryIds = supplier.MaterialCategories.Select(c => c.Id).Order().ToList();
+            var updatedCategoryIds = categoryIdsList.Order().ToList();
+            if (!existingCategoryIds.SequenceEqual(updatedCategoryIds))
             {
-                supplier.MaterialCategories.Add(category);
+                updatedCategories = categories;
+                changedFields.Add("MaterialCategories");
             }
-            changedFields.Add("MaterialCategories");
         }
 
         if (capabilities is not null)
@@ -433,26 +450,54 @@ public class SupplierService : ISupplierService
             var toRemove = supplier.Capabilities.Where(c => !capabilityNames.Contains(c.Name)).ToList();
             var toAdd = capabilityNames.Where(name => !supplier.Capabilities.Any(c => c.Name == name)).ToList();
 
-            foreach (var capability in toRemove)
+            if (toRemove.Count > 0 || toAdd.Count > 0)
             {
-                supplier.Capabilities.Remove(capability);
+                capabilitiesToRemove = toRemove;
+                capabilityNamesToAdd = toAdd;
+                updatedCapabilityNames = capabilityNames;
+                changedFields.Add("Capabilities");
             }
+        }
 
-            foreach (var name in toAdd)
+        if (changedFields.Count == 0)
+        {
+            var unchangedXmin = await ReadFreshXminAsync(supplier, cancellationToken);
+            return (supplier, unchangedXmin);
+        }
+
+        supplier.UpdatedAt = DateTime.UtcNow;
+        supplier.UpdatedBy = userId;
+
+        await _context.SaveChangesAsync(cancellationToken);
+        await _context.Entry(supplier).ReloadAsync(cancellationToken);
+        _context.Entry(supplier).State = EntityState.Unchanged;
+
+        if (updatedCategories is not null)
+        {
+            supplier.MaterialCategories.Clear();
+            foreach (var category in updatedCategories)
             {
-                supplier.Capabilities.Add(new SupplierCapability
+                supplier.MaterialCategories.Add(category);
+            }
+        }
+
+        if (capabilitiesToRemove is not null)
+        {
+            _context.SupplierCapabilities.RemoveRange(capabilitiesToRemove);
+        }
+
+        if (capabilityNamesToAdd is not null)
+        {
+            await _context.SupplierCapabilities.AddRangeAsync(
+                capabilityNamesToAdd.Select(name => new SupplierCapability
                 {
                     Id = Guid.NewGuid(),
                     SupplierId = supplier.Id,
                     Name = name,
                     IsActive = true
-                });
-            }
-            changedFields.Add("Capabilities");
+                }),
+                cancellationToken);
         }
-
-        supplier.UpdatedAt = DateTime.UtcNow;
-        supplier.UpdatedBy = userId;
 
         _auditService.LogChange(
             _context,
@@ -469,14 +514,14 @@ public class SupplierService : ISupplierService
                 supplier.Country,
                 supplier.PostalCode,
                 MaterialCategoryIds = supplier.MaterialCategories.Select(c => c.Id).ToList(),
-                Capabilities = supplier.Capabilities.Select(c => c.Name).ToList()
+                Capabilities = updatedCapabilityNames ?? supplier.Capabilities.Select(c => c.Name).ToList()
             },
             userId,
             userName);
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        await _cacheService.RemoveAsync($"supplier:{id}", cancellationToken);
+        await InvalidateSupplierCacheAsync(id, cancellationToken);
         await _cacheService.RemoveByPatternAsync("supplier:list:*", cancellationToken);
 
         await _publishEndpoint.Publish(new SupplierUpdatedEvent(
@@ -499,7 +544,7 @@ public class SupplierService : ISupplierService
             )
         ), cancellationToken);
 
-        var xmin = GetXmin(supplier);
+        var xmin = await ReadFreshXminAsync(supplier, cancellationToken);
         return (supplier, xmin);
     }
 
@@ -521,7 +566,9 @@ public class SupplierService : ISupplierService
             throw new InvalidOperationException("Supplier not found.");
         }
 
-        _context.Entry<Supplier>(supplier).Property<uint>("xmin").OriginalValue = rowVersion;
+        var xminProperty = _context.Entry<Supplier>(supplier).Property<uint>("xmin");
+        xminProperty.OriginalValue = rowVersion;
+        xminProperty.CurrentValue = rowVersion;
 
         var oldStatus = supplier.Status;
         supplier.Status = newStatus;
@@ -540,7 +587,7 @@ public class SupplierService : ISupplierService
             userName);
 
         await _context.SaveChangesAsync(cancellationToken);
-        await _cacheService.RemoveAsync($"supplier:{id}", cancellationToken);
+        await InvalidateSupplierCacheAsync(id, cancellationToken);
 
         await _publishEndpoint.Publish(new SupplierStatusChangedEvent(
             MessageId: Guid.NewGuid(),
@@ -562,7 +609,7 @@ public class SupplierService : ISupplierService
             )
         ), cancellationToken);
 
-        var xmin = GetXmin(supplier);
+        var xmin = await ReadFreshXminAsync(supplier, cancellationToken);
         return (supplier, xmin);
     }
 
@@ -713,7 +760,7 @@ public class SupplierService : ISupplierService
             userName);
 
         await _context.SaveChangesAsync(cancellationToken);
-        await _cacheService.RemoveAsync($"supplier:{supplierId}", cancellationToken);
+        await InvalidateSupplierCacheAsync(supplierId, cancellationToken);
 
         return certification;
     }
@@ -748,7 +795,7 @@ public class SupplierService : ISupplierService
             userName);
 
         await _context.SaveChangesAsync(cancellationToken);
-        await _cacheService.RemoveAsync($"supplier:{supplierId}", cancellationToken);
+        await InvalidateSupplierCacheAsync(supplierId, cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -913,7 +960,7 @@ public class SupplierService : ISupplierService
         await _context.SaveChangesAsync(cancellationToken);
         await _cacheService.RemoveAsync($"supplier:{supplierId}", cancellationToken);
 
-        var xmin = GetXmin(supplier);
+        var xmin = await ReadFreshXminAsync(supplier, cancellationToken);
         return (supplier, xmin);
     }
 
@@ -1013,7 +1060,7 @@ public class SupplierService : ISupplierService
         _context.Suppliers.Remove(supplier);
         await _context.SaveChangesAsync(cancellationToken);
 
-        await _cacheService.RemoveAsync($"supplier:{id}", cancellationToken);
+        await InvalidateSupplierCacheAsync(id, cancellationToken);
         await _cacheService.RemoveByPatternAsync("supplier:list:*", cancellationToken);
     }
 
@@ -1021,5 +1068,17 @@ public class SupplierService : ISupplierService
     private uint GetXmin(Supplier supplier)
     {
         return _context.Entry<Supplier>(supplier).Property<uint>("xmin").CurrentValue;
+    }
+
+    private async Task<uint> ReadFreshXminAsync(Supplier supplier, CancellationToken cancellationToken)
+    {
+        await _context.Entry(supplier).ReloadAsync(cancellationToken);
+        return GetXmin(supplier);
+    }
+
+    private async Task InvalidateSupplierCacheAsync(Guid supplierId, CancellationToken cancellationToken)
+    {
+        await _cacheService.RemoveAsync($"supplier:{supplierId}", cancellationToken);
+        await _cacheService.RemoveAsync($"supplier:{supplierId}:xmin", cancellationToken);
     }
 }
