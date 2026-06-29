@@ -258,6 +258,7 @@ public class SupplierService : ISupplierService
         }
 
         var supplier = await _context.Suppliers
+            .AsSplitQuery()
             .Include(s => s.Contacts)
             .Include(s => s.MaterialCategories)
             .Include(s => s.Capabilities)
@@ -362,6 +363,7 @@ public class SupplierService : ISupplierService
         CancellationToken cancellationToken = default)
     {
         var supplier = await _context.Suppliers
+            .AsSplitQuery()
             .Include(s => s.MaterialCategories)
             .Include(s => s.Capabilities)
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
@@ -654,6 +656,7 @@ public class SupplierService : ISupplierService
         CancellationToken cancellationToken = default)
     {
         var query = _context.Suppliers
+            .AsSplitQuery()
             .Include(s => s.MaterialCategories)
             .Include(s => s.Capabilities)
             .AsQueryable();
