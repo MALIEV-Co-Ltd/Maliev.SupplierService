@@ -159,7 +159,7 @@ public class SuppliersController : ControllerBase
     /// Get the minimal supplier reference used by dependent services.
     /// </summary>
     [HttpGet("{id:guid}/reference")]
-    [RequirePermission(SupplierPermissions.Suppliers.Read, PreValidateModel = true)]
+    [RequirePermission(SupplierPermissions.SupplierReferences.Read, PreValidateModel = true)]
     [ProducesResponseType(typeof(SupplierReferenceResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<SupplierReferenceResponse>> GetSupplierReference(

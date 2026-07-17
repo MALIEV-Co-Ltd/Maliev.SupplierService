@@ -238,7 +238,7 @@ public class SuppliersControllerTests : BaseIntegrationTest
             await context.SaveChangesAsync();
         }
         using var readerClient = Factory.CreatePermissionAuthenticatedClient(
-            permissions: [SupplierPermissions.Suppliers.Read]);
+            permissions: [SupplierPermissions.SupplierReferences.Read]);
 
         // Act
         var response = await readerClient.GetAsync($"/supplier/v1/suppliers/{supplier.Id}/reference");
@@ -268,7 +268,7 @@ public class SuppliersControllerTests : BaseIntegrationTest
             await context.SaveChangesAsync();
         }
         using var readerClient = Factory.CreatePermissionAuthenticatedClient(
-            permissions: [SupplierPermissions.Suppliers.Read]);
+            permissions: [SupplierPermissions.SupplierReferences.Read]);
 
         // Act
         var response = await readerClient.GetAsync($"/supplier/v1/suppliers/{supplier.Id}/reference");
@@ -355,6 +355,27 @@ public class SuppliersControllerTests : BaseIntegrationTest
 
         // Assert
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task MaterialReferenceReader_CanReadReferenceButNotLegacySupplierEndpoints()
+    {
+        // Arrange
+        var (supplier, _) = await CreateTestSupplierAsync(name: "Material Reference Supplier");
+        using var materialClient = Factory.CreatePermissionAuthenticatedClient(
+            permissions: [SupplierPermissions.SupplierReferences.Read]);
+
+        // Act
+        var reference = await materialClient.GetAsync($"/supplier/v1/suppliers/{supplier.Id}/reference");
+        var validation = await materialClient.GetAsync($"/supplier/v1/suppliers/{supplier.Id}/validate");
+        var list = await materialClient.GetAsync("/supplier/v1/suppliers");
+        var detail = await materialClient.GetAsync($"/supplier/v1/suppliers/{supplier.Id}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, reference.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, validation.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, list.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, detail.StatusCode);
     }
 
     [Fact]

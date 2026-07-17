@@ -131,7 +131,7 @@ public class SuppliersControllerContractTests
         Assert.Contains(apiVersion.Versions, version => version.MajorVersion == 1);
         Assert.Equal("supplier/v{version:apiVersion}/suppliers", controllerRoute?.Template);
         Assert.Equal("{id:guid}/reference", httpGet?.Template);
-        Assert.Equal(SupplierPermissions.Suppliers.Read, permission?.Permission);
+        Assert.Equal(SupplierPermissions.SupplierReferences.Read, permission?.Permission);
     }
 
     [Fact]
