@@ -20,17 +20,24 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        if (Context.Request.Headers.Authorization.Count == 0)
+        {
+            return Task.FromResult(AuthenticateResult.NoResult());
+        }
+
         var permissionKey = "";
 
         // Extract permission key from authentication scheme (format: "Test-key")
-        if (Context.Request.Headers.Authorization.Count > 0)
+        var authHeader = Context.Request.Headers.Authorization[0] ?? "";
+        var parts = authHeader.Split(' ');
+        if (parts.Length > 2 || parts.Length == 0 || parts[0] != AuthenticationScheme)
         {
-            var authHeader = Context.Request.Headers.Authorization[0] ?? "";
-            var parts = authHeader.Split(' ');
-            if (parts.Length == 2 && parts[0] == AuthenticationScheme)
-            {
-                permissionKey = parts[1];
-            }
+            return Task.FromResult(AuthenticateResult.NoResult());
+        }
+
+        if (parts.Length == 2)
+        {
+            permissionKey = parts[1];
         }
 
         var permissions = IntegrationTestWebAppFactory.GetPermissions(permissionKey);
