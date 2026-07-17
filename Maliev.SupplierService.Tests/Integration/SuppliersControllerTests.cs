@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
+using Maliev.SupplierService.Application.Authorization;
 using Maliev.SupplierService.Application.DTOs.Requests;
 using Maliev.SupplierService.Domain.Enums;
 using Maliev.SupplierService.Infrastructure.Persistence;
@@ -139,6 +140,57 @@ public class SuppliersControllerTests : BaseIntegrationTest
         var detail = await GetResponseAsync<SupplierDetailResponse>(response);
         Assert.NotNull(detail);
         Assert.Equal(supplier.Id, detail!.Id);
+    }
+
+    [Fact]
+    public async Task GetSupplier_MissingId_Returns404()
+    {
+        // Act
+        var response = await Client.GetAsync($"/supplier/v1/suppliers/{Guid.NewGuid()}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetSupplier_WithoutAuthentication_Returns401()
+    {
+        // Arrange
+        using var anonymousClient = Factory.CreateClient();
+
+        // Act
+        var response = await anonymousClient.GetAsync($"/supplier/v1/suppliers/{Guid.NewGuid()}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetSupplier_WithoutReadPermission_Returns403()
+    {
+        // Arrange
+        using var unauthorizedClient = Factory.CreatePermissionAuthenticatedClient(permissions: []);
+
+        // Act
+        var response = await unauthorizedClient.GetAsync($"/supplier/v1/suppliers/{Guid.NewGuid()}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetSupplier_WithReadPermission_Returns200()
+    {
+        // Arrange
+        var (supplier, _) = await CreateTestSupplierAsync();
+        using var readerClient = Factory.CreatePermissionAuthenticatedClient(
+            permissions: [SupplierPermissions.Suppliers.Read]);
+
+        // Act
+        var response = await readerClient.GetAsync($"/supplier/v1/suppliers/{supplier.Id}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
