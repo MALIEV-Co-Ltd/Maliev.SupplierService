@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
 using Maliev.SupplierService.Application.Authorization;
@@ -191,6 +192,69 @@ public class SuppliersControllerTests : BaseIntegrationTest
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ValidateSupplier_ActiveSupplier_ReturnsMaterialServiceProjection()
+    {
+        // Arrange
+        var (supplier, _) = await CreateTestSupplierAsync(name: "Active Contract Supplier");
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<SupplierDbContext>();
+            var persistedSupplier = await context.Suppliers.SingleAsync(item => item.Id == supplier.Id);
+            persistedSupplier.Status = SupplierStatus.Active;
+            await context.SaveChangesAsync();
+        }
+        using var readerClient = Factory.CreatePermissionAuthenticatedClient(
+            permissions: [SupplierPermissions.Suppliers.Read]);
+
+        // Act
+        var response = await readerClient.GetAsync($"/supplier/v1/suppliers/{supplier.Id}/validate");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = payload.RootElement;
+        Assert.Equal(supplier.Id, root.GetProperty("id").GetGuid());
+        Assert.Equal("Active Contract Supplier", root.GetProperty("companyName").GetString());
+        Assert.True(root.GetProperty("isActive").GetBoolean());
+    }
+
+    [Fact]
+    public async Task ValidateSupplier_MissingId_Returns404()
+    {
+        // Act
+        var response = await Client.GetAsync($"/supplier/v1/suppliers/{Guid.NewGuid()}/validate");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ValidateSupplier_WithoutAuthentication_Returns401()
+    {
+        // Arrange
+        using var anonymousClient = Factory.CreateClient();
+
+        // Act
+        var response = await anonymousClient.GetAsync($"/supplier/v1/suppliers/{Guid.NewGuid()}/validate");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ValidateSupplier_WithoutReadPermission_Returns403()
+    {
+        // Arrange
+        using var unauthorizedClient = Factory.CreatePermissionAuthenticatedClient(permissions: []);
+
+        // Act
+        var response = await unauthorizedClient.GetAsync($"/supplier/v1/suppliers/{Guid.NewGuid()}/validate");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
