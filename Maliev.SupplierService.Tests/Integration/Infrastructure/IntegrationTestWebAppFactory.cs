@@ -200,6 +200,7 @@ public class IntegrationTestWebAppFactory : WebApplicationFactory<Program>, IAsy
             return
             [
                 "supplier.suppliers.read",
+                "supplier.supplier-references.read",
                 "supplier.suppliers.create",
                 "supplier.suppliers.update",
                 "supplier.suppliers.delete",

@@ -28,6 +28,13 @@ public static class SupplierPermissions
         public const string Export = "supplier.suppliers.export";
     }
 
+    /// <summary>Minimal supplier reference permissions.</summary>
+    public static class SupplierReferences
+    {
+        /// <summary>Permission to read minimal supplier references.</summary>
+        public const string Read = "supplier.supplier-references.read";
+    }
+
     /// <summary>Contact resource permissions.</summary>
     public static class Contacts
     {
@@ -64,6 +71,7 @@ public static class SupplierPermissions
         { Suppliers.Approve, "Approve new suppliers" },
         { Suppliers.Suspend, "Suspend suppliers" },
         { Suppliers.Export, "Export supplier data" },
+        { SupplierReferences.Read, "Read minimal supplier references" },
         { Contacts.Create, "Create supplier contacts" },
         { Contacts.Read, "Read contact details" },
         { Contacts.Update, "Update contacts" },

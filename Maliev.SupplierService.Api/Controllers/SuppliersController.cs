@@ -156,6 +156,32 @@ public class SuppliersController : ControllerBase
     }
 
     /// <summary>
+    /// Get the minimal supplier reference used by dependent services.
+    /// </summary>
+    [HttpGet("{id:guid}/reference")]
+    [RequirePermission(SupplierPermissions.SupplierReferences.Read, PreValidateModel = true)]
+    [ProducesResponseType(typeof(SupplierReferenceResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<SupplierReferenceResponse>> GetSupplierReference(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var (isValid, supplier) = await _supplierService.ValidateSupplierAsync(id, cancellationToken);
+
+        if (!isValid || supplier is null)
+        {
+            return NotFound(new { message = $"Supplier with ID {id} not found" });
+        }
+
+        var response = new SupplierReferenceResponse(
+            supplier.Id,
+            supplier.CompanyName,
+            supplier.Status == SupplierStatus.Active);
+
+        return Ok(response);
+    }
+
+    /// <summary>
     /// Check supplier eligibility for purchase orders
     /// </summary>
     [HttpGet("{id:guid}/eligibility")]

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Maliev.SupplierService.Api.DTOs.Requests;
 using Maliev.SupplierService.Api.DTOs.Responses;
 using Maliev.SupplierService.Application.Authorization;
@@ -191,6 +192,190 @@ public class SuppliersControllerTests : BaseIntegrationTest
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ValidateSupplier_ActiveSupplier_PreservesLegacyProjection()
+    {
+        // Arrange
+        var (supplier, _) = await CreateTestSupplierAsync(name: "Active Contract Supplier");
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<SupplierDbContext>();
+            var persistedSupplier = await context.Suppliers.SingleAsync(item => item.Id == supplier.Id);
+            persistedSupplier.Status = SupplierStatus.Active;
+            await context.SaveChangesAsync();
+        }
+        using var readerClient = Factory.CreatePermissionAuthenticatedClient(
+            permissions: [SupplierPermissions.Suppliers.Read]);
+
+        // Act
+        var response = await readerClient.GetAsync($"/supplier/v1/suppliers/{supplier.Id}/validate");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = payload.RootElement;
+        Assert.Equal(
+            ["companyName", "id", "isActive", "status", "taxId"],
+            root.EnumerateObject().Select(property => property.Name).Order().ToArray());
+        Assert.Equal(supplier.Id, root.GetProperty("id").GetGuid());
+        Assert.Equal("Active Contract Supplier", root.GetProperty("companyName").GetString());
+        Assert.Equal(supplier.TaxId, root.GetProperty("taxId").GetString());
+        Assert.True(root.GetProperty("isActive").GetBoolean());
+    }
+
+    [Fact]
+    public async Task GetSupplierReference_ActiveSupplier_ReturnsExactMinimalProjection()
+    {
+        // Arrange
+        var (supplier, _) = await CreateTestSupplierAsync(name: "Active Reference Supplier");
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<SupplierDbContext>();
+            var persistedSupplier = await context.Suppliers.SingleAsync(item => item.Id == supplier.Id);
+            persistedSupplier.Status = SupplierStatus.Active;
+            await context.SaveChangesAsync();
+        }
+        using var readerClient = Factory.CreatePermissionAuthenticatedClient(
+            permissions: [SupplierPermissions.SupplierReferences.Read]);
+
+        // Act
+        var response = await readerClient.GetAsync($"/supplier/v1/suppliers/{supplier.Id}/reference");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = payload.RootElement;
+        Assert.Equal(
+            ["companyName", "id", "isActive"],
+            root.EnumerateObject().Select(property => property.Name).Order().ToArray());
+        Assert.Equal(supplier.Id, root.GetProperty("id").GetGuid());
+        Assert.Equal("Active Reference Supplier", root.GetProperty("companyName").GetString());
+        Assert.True(root.GetProperty("isActive").GetBoolean());
+    }
+
+    [Fact]
+    public async Task GetSupplierReference_SuspendedSupplier_Returns200WithIsActiveFalse()
+    {
+        // Arrange
+        var (supplier, _) = await CreateTestSupplierAsync(name: "Suspended Contract Supplier");
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<SupplierDbContext>();
+            var persistedSupplier = await context.Suppliers.SingleAsync(item => item.Id == supplier.Id);
+            persistedSupplier.Status = SupplierStatus.Suspended;
+            await context.SaveChangesAsync();
+        }
+        using var readerClient = Factory.CreatePermissionAuthenticatedClient(
+            permissions: [SupplierPermissions.SupplierReferences.Read]);
+
+        // Act
+        var response = await readerClient.GetAsync($"/supplier/v1/suppliers/{supplier.Id}/reference");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = payload.RootElement;
+        Assert.Equal(
+            ["companyName", "id", "isActive"],
+            root.EnumerateObject().Select(property => property.Name).Order().ToArray());
+        Assert.Equal(supplier.Id, root.GetProperty("id").GetGuid());
+        Assert.Equal("Suspended Contract Supplier", root.GetProperty("companyName").GetString());
+        Assert.False(root.GetProperty("isActive").GetBoolean());
+    }
+
+    [Fact]
+    public async Task ValidateSupplier_MissingId_Returns404()
+    {
+        // Act
+        var response = await Client.GetAsync($"/supplier/v1/suppliers/{Guid.NewGuid()}/validate");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ValidateSupplier_WithoutAuthentication_Returns401()
+    {
+        // Arrange
+        using var anonymousClient = Factory.CreateClient();
+
+        // Act
+        var response = await anonymousClient.GetAsync($"/supplier/v1/suppliers/{Guid.NewGuid()}/validate");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ValidateSupplier_WithoutReadPermission_Returns403()
+    {
+        // Arrange
+        using var unauthorizedClient = Factory.CreatePermissionAuthenticatedClient(permissions: []);
+
+        // Act
+        var response = await unauthorizedClient.GetAsync($"/supplier/v1/suppliers/{Guid.NewGuid()}/validate");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetSupplierReference_MissingId_Returns404()
+    {
+        // Act
+        var response = await Client.GetAsync($"/supplier/v1/suppliers/{Guid.NewGuid()}/reference");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetSupplierReference_WithoutAuthentication_Returns401()
+    {
+        // Arrange
+        using var anonymousClient = Factory.CreateClient();
+
+        // Act
+        var response = await anonymousClient.GetAsync($"/supplier/v1/suppliers/{Guid.NewGuid()}/reference");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetSupplierReference_WithoutReadPermission_Returns403()
+    {
+        // Arrange
+        using var unauthorizedClient = Factory.CreatePermissionAuthenticatedClient(permissions: []);
+
+        // Act
+        var response = await unauthorizedClient.GetAsync($"/supplier/v1/suppliers/{Guid.NewGuid()}/reference");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task MaterialReferenceReader_CanReadReferenceButNotLegacySupplierEndpoints()
+    {
+        // Arrange
+        var (supplier, _) = await CreateTestSupplierAsync(name: "Material Reference Supplier");
+        using var materialClient = Factory.CreatePermissionAuthenticatedClient(
+            permissions: [SupplierPermissions.SupplierReferences.Read]);
+
+        // Act
+        var reference = await materialClient.GetAsync($"/supplier/v1/suppliers/{supplier.Id}/reference");
+        var validation = await materialClient.GetAsync($"/supplier/v1/suppliers/{supplier.Id}/validate");
+        var list = await materialClient.GetAsync("/supplier/v1/suppliers");
+        var detail = await materialClient.GetAsync($"/supplier/v1/suppliers/{supplier.Id}");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, reference.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, validation.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, list.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, detail.StatusCode);
     }
 
     [Fact]
