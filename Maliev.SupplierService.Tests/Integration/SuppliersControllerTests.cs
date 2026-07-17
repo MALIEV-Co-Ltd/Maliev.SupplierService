@@ -216,9 +216,42 @@ public class SuppliersControllerTests : BaseIntegrationTest
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var root = payload.RootElement;
+        Assert.Equal(
+            ["companyName", "id", "isActive"],
+            root.EnumerateObject().Select(property => property.Name).Order().ToArray());
         Assert.Equal(supplier.Id, root.GetProperty("id").GetGuid());
         Assert.Equal("Active Contract Supplier", root.GetProperty("companyName").GetString());
         Assert.True(root.GetProperty("isActive").GetBoolean());
+    }
+
+    [Fact]
+    public async Task ValidateSupplier_SuspendedSupplier_Returns200WithIsActiveFalse()
+    {
+        // Arrange
+        var (supplier, _) = await CreateTestSupplierAsync(name: "Suspended Contract Supplier");
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<SupplierDbContext>();
+            var persistedSupplier = await context.Suppliers.SingleAsync(item => item.Id == supplier.Id);
+            persistedSupplier.Status = SupplierStatus.Suspended;
+            await context.SaveChangesAsync();
+        }
+        using var readerClient = Factory.CreatePermissionAuthenticatedClient(
+            permissions: [SupplierPermissions.Suppliers.Read]);
+
+        // Act
+        var response = await readerClient.GetAsync($"/supplier/v1/suppliers/{supplier.Id}/validate");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = payload.RootElement;
+        Assert.Equal(
+            ["companyName", "id", "isActive"],
+            root.EnumerateObject().Select(property => property.Name).Order().ToArray());
+        Assert.Equal(supplier.Id, root.GetProperty("id").GetGuid());
+        Assert.Equal("Suspended Contract Supplier", root.GetProperty("companyName").GetString());
+        Assert.False(root.GetProperty("isActive").GetBoolean());
     }
 
     [Fact]

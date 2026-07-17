@@ -148,8 +148,6 @@ public class SuppliersController : ControllerBase
         var response = new SupplierValidationResponse(
             supplier.Id,
             supplier.CompanyName,
-            supplier.TaxId,
-            supplier.Status,
             supplier.Status == SupplierStatus.Active);
 
         return Ok(response);
